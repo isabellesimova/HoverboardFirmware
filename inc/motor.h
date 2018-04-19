@@ -67,6 +67,7 @@ struct Motor {
 	volatile float pwm;
 	volatile float ratio;
 	volatile uint64_t hall_count;
+	volatile uint64_t hall_limit;
 
 	volatile uint16_t speed;
 	volatile int8_t direction; //+1 or -1
@@ -83,9 +84,10 @@ struct Motor {
 };
 
 void motors_setup_and_init(void);
+void motors_speeds(int16_t l_rpm, int16_t r_rpm);
+void motors_spline(int16_t l_rotations, int16_t r_rotations, int16_t rpm);
 void motors_stop();
 void motors_calibrate();
-void motors_speeds(int16_t l_rpm, int16_t r_rpm);
 
 void HALL_ISR_Callback(struct Motor *motor);
 void Duty_ISR_Callback(struct Motor *motor);

@@ -181,29 +181,6 @@ void motors_setup_and_init() {
   }
 }
 
-/* Stop both motors.
- */
-void motors_stop() {
-	motor_stop(&motor_L);
-	motor_stop(&motor_R);
-}
-
-/* Calibrate the motors by doing both directions for both the wheels.
- */
-void motors_calibrate() {
-	HAL_NVIC_DisableIRQ(motor_L.setup.TIM_DUTY_IRQn);
-	HAL_NVIC_DisableIRQ(motor_L.setup.TIM_SPEED_IRQn);
-
-	HAL_NVIC_DisableIRQ(motor_R.setup.TIM_DUTY_IRQn);
-	HAL_NVIC_DisableIRQ(motor_R.setup.TIM_SPEED_IRQn);
-
-	motor_calibrate(&motor_L, 1, 0);
-	motor_calibrate(&motor_L, -1, 0);
-
-	motor_calibrate(&motor_R, 1, 0);
-	motor_calibrate(&motor_R, -1, 0);
-}
-
 /* Set the speed for both motors.
  */
 void motors_speeds(int16_t l_rpm, int16_t r_rpm) {
@@ -232,6 +209,53 @@ void motors_speeds(int16_t l_rpm, int16_t r_rpm) {
 			motor_L.ratio = (float)motor_L.speed / (float)motor_R.speed;
 		}
 	}
+
+	motor_L.hall_limit = 0;
+	motor_R.hall_limit = 0;
+}
+
+/* Specifies a number of rotations for each wheel to go at a specific speed
+ */
+void motors_spline(int16_t l_rotations, int16_t r_rotations, int16_t rpm) {
+	float rpm_const = (int16_t)((float)(rpm * 2) / (float)(l_rotations + r_rotations));
+	int16_t l_rpm =  (int16_t)(rpm_const * l_rotations);
+	int16_t r_rpm =  (int16_t)(rpm_const * r_rotations);
+
+	// check limits for both speeds -- only go if both speeds are within range
+	if (abs(l_rpm) > MAX_SPEED || abs(l_rpm) < MIN_SPEED || abs(r_rpm) > MAX_SPEED || abs(r_rpm) < MIN_SPEED) {
+		SET_ERROR_BIT(status, STATUS_SPEED_OUT_OF_BOUNDS);
+		return;
+	} else {
+		CLR_ERROR_BIT(status, STATUS_SPEED_OUT_OF_BOUNDS);
+	}
+
+	motors_speeds(l_rpm, r_rpm);
+
+	motor_L.hall_limit = l_rotations * WHEEL_HALL_COUNTS;
+	motor_R.hall_limit = r_rotations * WHEEL_HALL_COUNTS;
+}
+
+/* Stop both motors.
+ */
+void motors_stop() {
+	motor_stop(&motor_L);
+	motor_stop(&motor_R);
+}
+
+/* Calibrate the motors by doing both directions for both the wheels.
+ */
+void motors_calibrate() {
+	HAL_NVIC_DisableIRQ(motor_L.setup.TIM_DUTY_IRQn);
+	HAL_NVIC_DisableIRQ(motor_L.setup.TIM_SPEED_IRQn);
+
+	HAL_NVIC_DisableIRQ(motor_R.setup.TIM_DUTY_IRQn);
+	HAL_NVIC_DisableIRQ(motor_R.setup.TIM_SPEED_IRQn);
+
+	motor_calibrate(&motor_L, 1, 0);
+	motor_calibrate(&motor_L, -1, 0);
+
+	motor_calibrate(&motor_R, 1, 0);
+	motor_calibrate(&motor_R, -1, 0);
 }
 
 //-------------------------------interrupt callbacks-------------------------------
@@ -302,6 +326,13 @@ void Speed_ISR_Callback(struct Motor *motor) {
 
 	motor->hall_count = motor->hall_count + diff;
 	motor->position = newPos;
+
+	// if you finish the spline, stop
+	// 0 means no limit
+	if (motor->hall_limit != 0 && motor->hall_limit <= motor->hall_count) {
+			motor_stop(motor);
+			return;
+	}
 
 	// if ratio is 0, doesn't matter what the difference is
 	if (motor->ratio != 0) {
