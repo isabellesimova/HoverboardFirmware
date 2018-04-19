@@ -57,6 +57,7 @@ static float BASE_DUTY_LOOKUP[NUM_PHASES][DUTY_STEPS];
 // ----------------------PRIVATE----------------------
 // motor control
 static void motor_init(struct Motor *motor);
+static void motor_reset(struct Motor *motor);
 static void motor_start(struct Motor *motor);
 static void motor_speed(struct Motor *motor, int16_t rpm);
 static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t power);
@@ -206,8 +207,31 @@ void motors_calibrate() {
 /* Set the speed for both motors.
  */
 void motors_speeds(int16_t l_rpm, int16_t r_rpm) {
+	int16_t old_left_speed = motor_L.speed;
+	uint16_t old_right_speed = motor_R.speed;
+
 	motor_speed(&motor_L, l_rpm);
 	motor_speed(&motor_R, r_rpm);
+
+	if (old_left_speed != motor_L.speed || old_right_speed != motor_R.speed) {
+		//reset the hall counts
+		motor_reset(&motor_L);
+		motor_reset(&motor_R);
+
+		//update the ratio
+		if (motor_L.stop == 1) {
+			motor_R.ratio = 0;
+		} else {
+			//speed is inversely proportion to rpm
+			motor_R.ratio = (float)motor_R.speed / (float)motor_L.speed;
+		}
+
+		if (motor_R.stop == 1) {
+			motor_L.ratio = 0;
+		} else {
+			motor_L.ratio = (float)motor_L.speed / (float)motor_R.speed;
+		}
+	}
 }
 
 //-------------------------------interrupt callbacks-------------------------------
@@ -262,6 +286,7 @@ void Speed_ISR_Callback(struct Motor *motor) {
 		return;
 	}
 
+	// figure out how much it has already moved
 	static int newPos;
 	if (motor->direction > 0) {
 		newPos = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
@@ -269,13 +294,35 @@ void Speed_ISR_Callback(struct Motor *motor) {
 		newPos = in_range(motor_get_position(motor) + motor->setup.OFFSET_NEG_HALL);
 	}
 
-	if (newPos == motor->position) {
+	static int8_t diff;
+	diff = in_range((newPos - motor->position) * motor->direction);
+	if (diff > 3) {
+		diff = diff - 6;
+	}
+
+	motor->hall_count = motor->hall_count + diff;
+	motor->position = newPos;
+
+	// if ratio is 0, doesn't matter what the difference is
+	if (motor->ratio != 0) {
+		//add itself, subtract both = subtract other
+		float hall_count_diff = motor->hall_count * motor->ratio + motor->hall_count - motor_L.hall_count - motor_R.hall_count;
+		float threshold = motor->ratio;
+		if (threshold < 1) threshold = 1;
+
+		if (hall_count_diff > threshold) {
+//			return;
+		}
+
+	}
+
+	// speed control
+	if (diff <= 0) {
 		motor_pwm(motor, motor->pwm + motor->pos_increment);
-	} else if (in_range(newPos - motor->position - motor->direction) != 0) {
+	} else if (diff > 1){
 		motor_pwm(motor, motor->pwm - motor->neg_increment);
 	}
 
-	motor->position = newPos;
 
 #if CONTROL_METHOD == TRAPEZOIDAL_CONTROL
 	// turn off the last things
@@ -315,15 +362,17 @@ void Speed_ISR_Callback(struct Motor *motor) {
 /* Initialize all the variables and all the timers related to a motor.
  */
 static void motor_init(struct Motor *motor) {
+
+	motor->speed = MIN_SPEED+1; //set it to something other than the MIN_SPEED
+	motor->pos_increment = 0.1; //backup values so it doesn't get stuck, shouldn't matter
+	motor->neg_increment = 0.1;
+
 	motor_speed(motor, MIN_SPEED);
 
 	motor->position = motor_get_position(motor);
 	motor->next_position = motor->position;
 
 	motor->pwm = 0;
-
-	motor->pos_increment = 0;
-	motor->neg_increment = 0;
 
 	motor_TIM_PWM_init(motor);
 	motor_TIM_Duty_init(motor);
@@ -342,10 +391,22 @@ static void motor_init(struct Motor *motor) {
 	motor->timer_duty_cnt = 0;
 }
 
+/* Reset the hall count for the wheel, and reset the current position.
+ */
+static void motor_reset(struct Motor *motor) {
+	motor->hall_count = 0;
+	if (motor->direction > 0) {
+		motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
+	} else {
+		motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_NEG_HALL);
+	}
+}
+
 /* Start the motor by enabling the interrupts and
  * setting the duty cycles to 0.
  */
 static void motor_start(struct Motor *motor) {
+	motor_reset(motor);
 	motor_set_pwm_all(motor, 0);
 	HAL_NVIC_SetPriority(motor->setup.EXTI_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(motor->setup.EXTI_IRQn);
@@ -363,10 +424,7 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 	}
 
 	//check it is in the valid range
-	int absrpm = rpm;
-	if (absrpm < 0) {
-		absrpm = 0 - absrpm;
-	}
+	int absrpm = abs(rpm);
 
 	if (absrpm > MAX_SPEED) {
 		absrpm = MAX_SPEED;
@@ -405,6 +463,8 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 	}
 
 	if (motor->stop == 1) {
+		motor->pos_increment = 1;
+		motor->neg_increment = 0.1;
 		motor_start(motor);
 	}
 

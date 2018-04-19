@@ -65,6 +65,8 @@ struct Motor {
 	volatile uint8_t next_position; //hall
 
 	volatile float pwm;
+	volatile float ratio;
+	volatile uint64_t hall_count;
 
 	volatile uint16_t speed;
 	volatile int8_t direction; //+1 or -1
