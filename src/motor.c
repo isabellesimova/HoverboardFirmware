@@ -148,6 +148,9 @@ void motors_setup_and_init() {
 	motor_R.setup.GPIO_HIGH_PORT = GPIOA;
 	motor_R.setup.GPIO_HIGH_CH_PINS = GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10;
 
+	motor_L.other_motor = &motor_R;
+	motor_R.other_motor = &motor_L;
+
 	motor_init(&motor_L);
 	motor_init(&motor_R);
 
@@ -374,30 +377,57 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	motor->delta = motor->hall_count - motor->last_hall_count;
 	motor->last_hall_count = motor->hall_count;
 
+	float hall_count_diff = 0;
+	float threshold = 0;
 
 	// if ratio is 0, doesn't matter what the difference is
 	if (motor->ratio != 0) {
-		//add itself, subtract both = subtract other
-		float hall_count_diff = motor->hall_count * motor->ratio + motor->hall_count - motor_L.hall_count - motor_R.hall_count;
-		float threshold = motor->ratio;
+		hall_count_diff = motor->hall_count * motor->ratio - motor->other_motor->hall_count;
+		threshold = motor->ratio;
 		if (threshold < 1) threshold = 1;
-
-		if (hall_count_diff > threshold) {
-//			return;
-		}
-
 	}
 
-	// speed control
-	if (motor->delta <= 0) {
-		motor_pwm(motor, motor->pwm + motor->pos_increment);
-		motor->neg_increment = 0.1;
-	} else if (motor->delta > 1){
-		motor_pwm(motor, motor->pwm - motor->neg_increment);
-		motor->pos_increment = 0.1;
-	} else {
-		motor->pos_increment = 0.1;
-		motor->neg_increment = 0.1;
+
+	if (hall_count_diff > threshold) { 	// one wheel is ahead of the other
+
+		/* If this wheel is ahead of the other wheel,
+		 * THIS (T) can go slower (T-)
+		 * or the OTHER (O) can go slower(O-) or faster (O+)
+		 *
+		 * We want to get THIS delta to be < 1 and the OTHER delta to be = 1.
+		 *
+		 *						   THIS WHEEL
+		 *              |---------|---------|---------|
+		 *              |   < 1   |   = 1   |   > 1   |
+		 *       |------|---------|---------|---------|
+		 *   O   | <  1 |    O+   |  T-, O+ |  T-, O+ |
+		 *   T   |------|---------|---------|---------|
+		 *   H   | =  1 |         |    T-   |   T-    |
+		 *   E   |------|---------|---------|---------|
+		 *   R   | >  1 |    O-   |  T-, O- |  T-, O- |
+		 *       |------|---------|---------|---------|
+		 */
+		if (motor->other_motor->delta < 1) {
+			motor_pwm(motor->other_motor, motor->other_motor->pwm + motor->other_motor->pos_increment);
+		} else {
+			motor_pwm(motor->other_motor, motor->other_motor->pwm - motor->other_motor->neg_increment);
+		}
+
+		if (motor->delta >= 1) {
+			motor_pwm(motor, motor->pwm - motor->neg_increment);
+		}
+	} else { // the wheels are basically at the same place
+		// speed control
+		if (motor->delta <= 0) {
+			motor_pwm(motor, motor->pwm + motor->pos_increment);
+			motor->neg_increment = 0.1;
+		} else if (motor->delta > 1){
+			motor_pwm(motor, motor->pwm - motor->neg_increment);
+			motor->pos_increment = 0.1;
+		} else {
+			motor->pos_increment = 0.1;
+			motor->neg_increment = 0.1;
+		}
 	}
 
 	// double check the position if no change in a while

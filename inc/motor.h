@@ -60,6 +60,7 @@ struct Motor_setup {
 // volatile variables that change on interrupts
 struct Motor {
 	struct Motor_setup setup;
+	struct Motor* other_motor;
 	volatile uint32_t uwPeriodValue;
 	volatile uint8_t position; //hall
 	volatile uint8_t next_position; //hall
