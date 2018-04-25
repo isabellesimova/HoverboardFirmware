@@ -260,57 +260,15 @@ void motors_calibrate() {
 
 //-------------------------------interrupt callbacks-------------------------------
 /* This is the interrupt function for whenever the hall sensor readings change.
+ * Do the actual commutation!
  */
 void HALL_ISR_Callback(struct Motor *motor) {
-
-}
-
-/* This is the interrupt function to change the duty cycle 16x per commutation phase.
- * Duration: ~15 microseconds
- */
-void Duty_ISR_Callback(struct Motor *motor) {
-	int i, index;
-
+	// stop -- don't do the commutation
 	if (motor->stop) {
 		return;
 	}
 
-	if (motor->timer_duty_cnt == DUTY_STEPS) {
-		return;
-	}
-
-	if (motor->direction > 0) {
-		index = motor->timer_duty_cnt;
-	} else {
-		index = DUTY_STEPS - 1 - motor->timer_duty_cnt;
-	}
-
-	for (i = 0; i < 3; i++) {
-		motor->PWM_DUTIES[i] = ((motor->DUTY_LOOKUP[in_range(2*i + motor->next_position)][index]));
-		motor_set_pwm(motor, i, motor->PWM_DUTIES[i]);
-	}
-
-	motor->timer_duty_cnt += 1;
-}
-
-/* This is the interrupt function to change the commutation phase.
- * It also checks to make sure the heart beat is valid.
- * Duration: ~25 microseconds
- */
-void Speed_ISR_Callback(struct Motor *motor) {
-	// if no new data in a second, stop!!
-	if (HAL_GetTick() - last_rx_time > HEARTBEAT_PERIOD) {
-		motor_stop(motor);
-		SET_ERROR_BIT(status, STATUS_HEARTBEAT_MISSING);
-	} else {
-		CLR_ERROR_BIT(status, STATUS_HEARTBEAT_MISSING);
-	}
-
-	if (motor->stop) {
-		return;
-	}
-
-	// figure out how much it has already moved
+	// figure out how much it has already moved - expect it to be one, but just in case.
 	static int newPos;
 	if (motor->direction > 0) {
 		newPos = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
@@ -330,30 +288,12 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	// if you finish the spline, stop
 	// 0 means no limit
 	if (motor->hall_limit != 0 && motor->hall_limit <= motor->hall_count) {
-			motor_stop(motor);
-			return;
+		motor_stop(motor);
+		return;
 	}
 
-	// if ratio is 0, doesn't matter what the difference is
-	if (motor->ratio != 0) {
-		//add itself, subtract both = subtract other
-		float hall_count_diff = motor->hall_count * motor->ratio + motor->hall_count - motor_L.hall_count - motor_R.hall_count;
-		float threshold = motor->ratio;
-		if (threshold < 1) threshold = 1;
 
-		if (hall_count_diff > threshold) {
-//			return;
-		}
-
-	}
-
-	// speed control
-	if (diff <= 0) {
-		motor_pwm(motor, motor->pwm + motor->pos_increment);
-	} else if (diff > 1){
-		motor_pwm(motor, motor->pwm - motor->neg_increment);
-	}
-
+	// do the actual commutation
 
 #if CONTROL_METHOD == TRAPEZOIDAL_CONTROL
 	// turn off the last things
@@ -382,9 +322,88 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	motor_high_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][1]); //not necessary for trapezoidal
 #endif
 
-	motor_low_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
 
-	__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), (motor->speed >> 4) - 1);
+	motor_low_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
+}
+
+/* This is the interrupt function to change the duty cycle 16x per commutation phase.
+ * Duration: ~15 microseconds
+ */
+void Duty_ISR_Callback(struct Motor *motor) {
+	int i, index;
+
+	if (motor->stop) {
+		return;
+	}
+
+	if (motor->direction > 0) {
+		index = motor->timer_duty_cnt;
+	} else {
+		index = DUTY_STEPS - 1 - motor->timer_duty_cnt;
+	}
+
+	for (i = 0; i < 3; i++) {
+		motor->PWM_DUTIES[i] = ((motor->DUTY_LOOKUP[in_range(2*i + motor->next_position)][index]));
+		motor_set_pwm(motor, i, motor->PWM_DUTIES[i]);
+	}
+
+	// don't let it get to DUTY_STEPS ever -- hold it at DUTY_STEPS - 1
+	if (motor->timer_duty_cnt < DUTY_STEPS - 1) {
+		motor->timer_duty_cnt += 1;
+	}
+}
+
+/* This is the interrupt function to check that the speed is correct.
+ * It also checks to make sure the heart beat is valid.
+ * Duration: ~25 microseconds
+ */
+void Speed_ISR_Callback(struct Motor *motor) {
+	// if no new data in a second, stop!!
+	if (HAL_GetTick() - last_rx_time > HEARTBEAT_PERIOD) {
+		motor_stop(motor);
+		SET_ERROR_BIT(status, STATUS_HEARTBEAT_MISSING);
+	} else {
+		CLR_ERROR_BIT(status, STATUS_HEARTBEAT_MISSING);
+	}
+
+	if (motor->stop) {
+		return;
+	}
+
+
+	motor->delta = motor->hall_count - motor->last_hall_count;
+	motor->last_hall_count = motor->hall_count;
+
+
+	// if ratio is 0, doesn't matter what the difference is
+	if (motor->ratio != 0) {
+		//add itself, subtract both = subtract other
+		float hall_count_diff = motor->hall_count * motor->ratio + motor->hall_count - motor_L.hall_count - motor_R.hall_count;
+		float threshold = motor->ratio;
+		if (threshold < 1) threshold = 1;
+
+		if (hall_count_diff > threshold) {
+//			return;
+		}
+
+	}
+
+	// speed control
+	if (motor->delta <= 0) {
+		motor_pwm(motor, motor->pwm + motor->pos_increment);
+		motor->neg_increment = 0.1;
+	} else if (motor->delta > 1){
+		motor_pwm(motor, motor->pwm - motor->neg_increment);
+		motor->pos_increment = 0.1;
+	} else {
+		motor->pos_increment = 0.1;
+		motor->neg_increment = 0.1;
+	}
+
+	// double check the position if no change in a while
+	if (motor->delta ==0) {
+		HALL_ISR_Callback(motor);
+	}
 }
 
 // ----------------------PRIVATE----------------------
@@ -425,6 +444,7 @@ static void motor_init(struct Motor *motor) {
 /* Reset the hall count for the wheel, and reset the current position.
  */
 static void motor_reset(struct Motor *motor) {
+	motor->last_hall_count = 0;
 	motor->hall_count = 0;
 	if (motor->direction > 0) {
 		motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
@@ -443,6 +463,7 @@ static void motor_start(struct Motor *motor) {
 	HAL_NVIC_EnableIRQ(motor->setup.EXTI_IRQn);
 	motor_pwm(motor, 0);
 	motor->stop = 0;
+	HALL_ISR_Callback(motor);
 }
 
 /* Set the speed for a motor by setting the timer to the right value.
@@ -482,7 +503,7 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 
 	if (old_speed != motor->speed) {
 		if (old_speed < motor->speed) {
-			motor->pos_increment = 1;
+			motor->pos_increment = 0.5;
 			motor->neg_increment = 0.1;
 		} else if (old_speed > motor->speed) {
 			motor->pos_increment = 0.1;
@@ -491,10 +512,11 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 
 		// set the register of the next thing
 		__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
+		__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), (motor->speed >> 4) - 1);
 	}
 
 	if (motor->stop == 1) {
-		motor->pos_increment = 1;
+		motor->pos_increment = 0.5;
 		motor->neg_increment = 0.1;
 		motor_start(motor);
 	}
@@ -770,7 +792,7 @@ static void motor_TIM_Duty_init(struct Motor *motor) {
 	motor->setup.htim_duty.Init.Period = (motor->speed >> 4) -1;//period to update the duty cycle, 1/16 of speed
 	motor->setup.htim_duty.Init.ClockDivision = 0;
 	motor->setup.htim_duty.Init.CounterMode = TIM_COUNTERMODE_UP;
-	HAL_NVIC_SetPriority(motor->setup.TIM_DUTY_IRQn, 2, 0);
+	HAL_NVIC_SetPriority(motor->setup.TIM_DUTY_IRQn, 0, 0);
 	HAL_TIM_Base_Init(&(motor->setup.htim_duty));
 	HAL_TIM_Base_Start_IT(&(motor->setup.htim_duty));
 	HAL_NVIC_EnableIRQ(motor->setup.TIM_DUTY_IRQn);
@@ -789,7 +811,7 @@ static void motor_TIM_Speed_init(struct Motor *motor) {
 	motor->setup.htim_speed.Init.Period = motor->speed - 1;
 	motor->setup.htim_speed.Init.ClockDivision = 0;
 	motor->setup.htim_speed.Init.CounterMode = TIM_COUNTERMODE_UP;
-	HAL_NVIC_SetPriority(motor->setup.TIM_SPEED_IRQn, 1, 0);
+	HAL_NVIC_SetPriority(motor->setup.TIM_SPEED_IRQn, 0, 0);
 	HAL_TIM_Base_Init(&(motor->setup.htim_speed));
 	HAL_TIM_Base_Start_IT(&(motor->setup.htim_speed));
 	HAL_NVIC_EnableIRQ(motor->setup.TIM_SPEED_IRQn);

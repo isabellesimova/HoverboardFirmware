@@ -66,6 +66,8 @@ struct Motor {
 
 	volatile float pwm;
 	volatile float ratio;
+	volatile int64_t delta;
+	volatile uint64_t last_hall_count;
 	volatile uint64_t hall_count;
 	volatile uint64_t hall_limit;
 
