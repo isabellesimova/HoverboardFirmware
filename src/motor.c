@@ -187,7 +187,7 @@ void motors_setup_and_init() {
 /* Set the speed for both motors.
  */
 void motors_speeds(int16_t l_rpm, int16_t r_rpm) {
-	int16_t old_left_speed = motor_L.speed;
+	uint16_t old_left_speed = motor_L.speed;
 	uint16_t old_right_speed = motor_R.speed;
 
 	motor_speed(&motor_L, l_rpm);
@@ -372,7 +372,6 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	if (motor->stop) {
 		return;
 	}
-
 
 	motor->delta = motor->hall_count - motor->last_hall_count;
 	motor->last_hall_count = motor->hall_count;
