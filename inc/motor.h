@@ -20,6 +20,7 @@ extern "C" {
 #define NUM_PHASES 6
 #define DUTY_STEPS 16
 #define PI 3.14159265358
+#define MOTOR_SPEED_CHECK 8
 
 //non volatile stuff, constant things
 struct Motor_setup {

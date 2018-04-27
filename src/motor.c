@@ -384,8 +384,8 @@ void Speed_ISR_Callback(struct Motor *motor) {
 		hall_count_diff = motor->hall_count * motor->ratio - motor->other_motor->hall_count;
 		threshold = motor->ratio;
 		if (threshold < 1) threshold = 1;
+		threshold = threshold * 2;
 	}
-
 
 	if (hall_count_diff > threshold) { 	// one wheel is ahead of the other
 
@@ -406,21 +406,21 @@ void Speed_ISR_Callback(struct Motor *motor) {
 		 *   R   | >  1 |    O-   |  T-, O- |  T-, O- |
 		 *       |------|---------|---------|---------|
 		 */
-		if (motor->other_motor->delta < 1) {
+		if (motor->other_motor->delta < MOTOR_SPEED_CHECK) {
 			motor_pwm(motor->other_motor, motor->other_motor->pwm + motor->other_motor->pos_increment);
 		} else {
 			motor_pwm(motor->other_motor, motor->other_motor->pwm - motor->other_motor->neg_increment);
 		}
 
-		if (motor->delta >= 1) {
+		if (motor->delta >= MOTOR_SPEED_CHECK) {
 			motor_pwm(motor, motor->pwm - motor->neg_increment);
 		}
 	} else { // the wheels are basically at the same place
 		// speed control
-		if (motor->delta <= 0) {
+		if (motor->delta < MOTOR_SPEED_CHECK) {
 			motor_pwm(motor, motor->pwm + motor->pos_increment);
 			motor->neg_increment = 0.1;
-		} else if (motor->delta > 1){
+		} else if (motor->delta > MOTOR_SPEED_CHECK){
 			motor_pwm(motor, motor->pwm - motor->neg_increment);
 			motor->pos_increment = 0.1;
 		} else {
