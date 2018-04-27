@@ -376,62 +376,32 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	motor->delta = motor->hall_count - motor->last_hall_count;
 	motor->last_hall_count = motor->hall_count;
 
-	float hall_count_diff = 0;
-	float threshold = 0;
+	motor->speed_count += 1;
+	if (motor->speed_count == MOTOR_SPEED_CHECK) {
+		motor->speed_count = 0;
+		motor->delta = motor->hall_count - motor->last_hall_count;
+		motor->last_hall_count = motor->hall_count;
 
-	// if ratio is 0, doesn't matter what the difference is
-	if (motor->ratio != 0) {
-		hall_count_diff = motor->hall_count * motor->ratio - motor->other_motor->hall_count;
-		threshold = motor->ratio;
-		if (threshold < 1) threshold = 1;
-		threshold = threshold * 2;
-	}
+		// pid control
+		int disterror = MOTOR_SPEED_CHECK - motor->delta;
 
-	if (hall_count_diff > threshold) { 	// one wheel is ahead of the other
+		motor->dist_int = motor->dist_int + disterror;
 
-		/* If this wheel is ahead of the other wheel,
-		 * THIS (T) can go slower (T-)
-		 * or the OTHER (O) can go slower(O-) or faster (O+)
-		 *
-		 * We want to get THIS delta to be < 1 and the OTHER delta to be = 1.
-		 *
-		 *						   THIS WHEEL
-		 *              |---------|---------|---------|
-		 *              |   < 1   |   = 1   |   > 1   |
-		 *       |------|---------|---------|---------|
-		 *   O   | <  1 |    O+   |  T-, O+ |  T-, O+ |
-		 *   T   |------|---------|---------|---------|
-		 *   H   | =  1 |         |    T-   |   T-    |
-		 *   E   |------|---------|---------|---------|
-		 *   R   | >  1 |    O-   |  T-, O- |  T-, O- |
-		 *       |------|---------|---------|---------|
-		 */
-		if (motor->other_motor->delta < MOTOR_SPEED_CHECK) {
-			motor_pwm(motor->other_motor, motor->other_motor->pwm + motor->other_motor->pos_increment);
-		} else {
-			motor_pwm(motor->other_motor, motor->other_motor->pwm - motor->other_motor->neg_increment);
+		motor->dist_der = disterror - motor->dist_pro;
+
+		motor->dist_pro = disterror;
+
+		float K1P = 0.01;
+		float K1I = 0.02;
+		float K1D = 0.005;
+		float distspeed = K1P * disterror + K1I * motor->dist_int + K1D * motor->dist_der;
+
+		motor_pwm(motor, distspeed);
+
+		// double check the position if no change in a while
+		if (motor->delta ==0) {
+			HALL_ISR_Callback(motor);
 		}
-
-		if (motor->delta >= MOTOR_SPEED_CHECK) {
-			motor_pwm(motor, motor->pwm - motor->neg_increment);
-		}
-	} else { // the wheels are basically at the same place
-		// speed control
-		if (motor->delta < MOTOR_SPEED_CHECK) {
-			motor_pwm(motor, motor->pwm + motor->pos_increment);
-			motor->neg_increment = 0.1;
-		} else if (motor->delta > MOTOR_SPEED_CHECK){
-			motor_pwm(motor, motor->pwm - motor->neg_increment);
-			motor->pos_increment = 0.1;
-		} else {
-			motor->pos_increment = 0.1;
-			motor->neg_increment = 0.1;
-		}
-	}
-
-	// double check the position if no change in a while
-	if (motor->delta ==0) {
-		HALL_ISR_Callback(motor);
 	}
 }
 
@@ -473,6 +443,11 @@ static void motor_init(struct Motor *motor) {
 /* Reset the hall count for the wheel, and reset the current position.
  */
 static void motor_reset(struct Motor *motor) {
+	motor->dist_int = 0;
+	motor->dist_der = 0;
+	motor->dist_pro = MOTOR_SPEED_CHECK;
+
+	motor->speed_count = 0;
 	motor->last_hall_count = 0;
 	motor->hall_count = 0;
 	if (motor->direction > 0) {
