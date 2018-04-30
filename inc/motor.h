@@ -98,7 +98,7 @@ void motors_spline(int16_t l_rotations, int16_t r_rotations, int16_t rpm);
 void motors_stop();
 void motors_calibrate();
 
-void HALL_ISR_Callback(struct Motor *motor);
+void HALL_ISR_Callback(struct Motor *motor, int force_update);
 void Duty_ISR_Callback(struct Motor *motor);
 void Speed_ISR_Callback(struct Motor *motor);
 

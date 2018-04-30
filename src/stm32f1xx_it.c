@@ -261,7 +261,7 @@ void EXTI15_10_IRQHandler(void)
 			(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_11) != RESET)||
 			(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_12) != RESET))
 	{
-		HALL_ISR_Callback(&motor_R);
+		HALL_ISR_Callback(&motor_R, 0);
 
 		__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_10);
 		__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_11);
@@ -278,7 +278,7 @@ void EXTI9_5_IRQHandler(void)
 			(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_6) != RESET)||
 			(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_7) != RESET))
 	{
-		HALL_ISR_Callback(&motor_L);
+		HALL_ISR_Callback(&motor_L, 0);
 
 		__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_5);
 		__HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_6);

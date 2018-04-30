@@ -44,6 +44,11 @@
  */
 #define WHEEL_HALL_COUNTS 		90
 
+/*
+ * A lower bound on what duty cycle needs to be provided to move the wheel
+ */
+#define MIN_MOVEMENT			3.0
+
 /* WHEEL SETUP
  * The _OFFSET constants are sent via UART when the microcontroller runs the
  * firmware in CALIBRATION mode.

@@ -265,7 +265,7 @@ void motors_calibrate() {
 /* This is the interrupt function for whenever the hall sensor readings change.
  * Do the actual commutation!
  */
-void HALL_ISR_Callback(struct Motor *motor) {
+void HALL_ISR_Callback(struct Motor *motor, int force_update) {
 	// stop -- don't do the commutation
 	if (motor->stop) {
 		return;
@@ -285,48 +285,62 @@ void HALL_ISR_Callback(struct Motor *motor) {
 		diff = diff - 6;
 	}
 
-	motor->hall_count = motor->hall_count + diff;
-	motor->position = newPos;
+	static uint32_t lastNegTime = 0;
 
-	// if you finish the spline, stop
-	// 0 means no limit
-	if (motor->hall_limit != 0 && motor->hall_limit <= motor->hall_count) {
-		motor_stop(motor);
-		return;
+	if (force_update || diff != 0) {
+		if (diff == -1) {
+			// don't update if the hall reading is just shaking back and forth when the wheel is stuck
+			if (HAL_GetTick() - lastNegTime < motor->speed) {
+				return;
+			} else {
+				lastNegTime = HAL_GetTick();
+			}
+
+		}
+
+		motor->hall_count = motor->hall_count + diff;
+		motor->position = newPos;
+
+		// if you finish the spline, stop
+		// 0 means no limit
+		if (motor->hall_limit != 0 && motor->hall_limit <= motor->hall_count) {
+			motor_stop(motor);
+			return;
+		}
+
+
+		// do the actual commutation
+
+	#if CONTROL_METHOD == TRAPEZOIDAL_CONTROL
+		// turn off the last things
+		motor_high_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][0]);
+		motor_low_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
+	#endif
+
+		// new position
+		motor->next_position = in_range(motor->position + motor->direction);
+
+		//turn off the wrong things:
+		motor_low_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][0]);
+		motor_low_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][1]);
+		motor_high_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
+
+		//set the pwm duties
+		motor->timer_duty_cnt = 0;
+		Duty_ISR_Callback(motor);
+
+		//based on next position, figure out what the next channels to turn on are
+		motor_set_pwm(motor, REVERSE_HALL_LOOKUP[motor->next_position][0], motor->PWM_DUTIES[REVERSE_HALL_LOOKUP[motor->next_position][0]]);
+		motor_high_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][0]);
+
+		motor_set_pwm(motor, REVERSE_HALL_LOOKUP[motor->next_position][1], motor->PWM_DUTIES[REVERSE_HALL_LOOKUP[motor->next_position][1]]);
+	#if CONTROL_METHOD == SINUSOIDAL_CONTROL
+		motor_high_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][1]); //not necessary for trapezoidal
+	#endif
+
+
+		motor_low_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
 	}
-
-
-	// do the actual commutation
-
-#if CONTROL_METHOD == TRAPEZOIDAL_CONTROL
-	// turn off the last things
-	motor_high_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][0]);
-	motor_low_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
-#endif
-
-	// new position
-	motor->next_position = in_range(motor->position + motor->direction);
-
-	//turn off the wrong things:
-	motor_low_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][0]);
-	motor_low_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][1]);
-	motor_high_off(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
-
-	//set the pwm duties
-	motor->timer_duty_cnt = 0;
-	Duty_ISR_Callback(motor);
-
-	//based on next position, figure out what the next channels to turn on are
-	motor_set_pwm(motor, REVERSE_HALL_LOOKUP[motor->next_position][0], motor->PWM_DUTIES[REVERSE_HALL_LOOKUP[motor->next_position][0]]);
-	motor_high_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][0]);
-
-	motor_set_pwm(motor, REVERSE_HALL_LOOKUP[motor->next_position][1], motor->PWM_DUTIES[REVERSE_HALL_LOOKUP[motor->next_position][1]]);
-#if CONTROL_METHOD == SINUSOIDAL_CONTROL
-	motor_high_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][1]); //not necessary for trapezoidal
-#endif
-
-
-	motor_low_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
 }
 
 /* This is the interrupt function to change the duty cycle 16x per commutation phase.
@@ -373,9 +387,6 @@ void Speed_ISR_Callback(struct Motor *motor) {
 		return;
 	}
 
-	motor->delta = motor->hall_count - motor->last_hall_count;
-	motor->last_hall_count = motor->hall_count;
-
 	motor->speed_count += 1;
 	if (motor->speed_count == MOTOR_SPEED_CHECK) {
 		motor->speed_count = 0;
@@ -396,11 +407,11 @@ void Speed_ISR_Callback(struct Motor *motor) {
 		float K1D = 0.005;
 		float distspeed = K1P * disterror + K1I * motor->dist_int + K1D * motor->dist_der;
 
-		motor_pwm(motor, distspeed);
+		motor_pwm(motor, distspeed + MIN_MOVEMENT);
 
 		// double check the position if no change in a while
 		if (motor->delta ==0) {
-			HALL_ISR_Callback(motor);
+			HALL_ISR_Callback(motor, 1);
 		}
 	}
 }
@@ -467,7 +478,7 @@ static void motor_start(struct Motor *motor) {
 	HAL_NVIC_EnableIRQ(motor->setup.EXTI_IRQn);
 	motor_pwm(motor, 0);
 	motor->stop = 0;
-	HALL_ISR_Callback(motor);
+	HALL_ISR_Callback(motor, 1);
 }
 
 /* Set the speed for a motor by setting the timer to the right value.
