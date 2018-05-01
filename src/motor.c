@@ -298,12 +298,12 @@ void HALL_ISR_Callback(struct Motor *motor, int force_update) {
 
 		}
 
-		motor->hall_count = motor->hall_count + diff;
+		motor->this_hall_count = motor->this_hall_count + diff;
 		motor->position = newPos;
 
 		// if you finish the spline, stop
 		// 0 means no limit
-		if (motor->hall_limit != 0 && motor->hall_limit <= motor->hall_count) {
+		if (motor->hall_limit != 0 && motor->hall_limit <= motor->this_hall_count) {
 			motor_stop(motor);
 			return;
 		}
@@ -390,24 +390,35 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	motor->speed_count += 1;
 	if (motor->speed_count == MOTOR_SPEED_CHECK) {
 		motor->speed_count = 0;
-		motor->delta = motor->hall_count - motor->last_hall_count;
-		motor->last_hall_count = motor->hall_count;
+
+		motor->delta = motor->this_hall_count - motor->last_hall_count;
+		motor->last_hall_count = motor->this_hall_count;
+		motor->total_hall_count += motor->delta;
 
 		// pid control
-		int disterror = MOTOR_SPEED_CHECK - motor->delta;
+		if ((motor->updated < motor->other_motor->updated) || motor->ratio == 0) {
+			float disterror = MOTOR_SPEED_CHECK - (motor->delta + motor->other_motor->delta)/2;
+			float differror = motor->total_hall_count * motor->ratio - motor->other_motor->total_hall_count;
 
-		motor->dist_int = motor->dist_int + disterror;
+			motor->dist_int = motor->dist_int + disterror;
+			motor->diff_int = motor->diff_int + differror;
 
-		motor->dist_der = disterror - motor->dist_pro;
+			motor->dist_der = disterror - motor->dist_pro;
+			motor->diff_der = differror - motor->diff_pro;
 
-		motor->dist_pro = disterror;
+			motor->dist_pro = disterror;
+			motor->diff_pro = differror;
 
-		float K1P = 0.01;
-		float K1I = 0.02;
-		float K1D = 0.005;
-		float distspeed = K1P * disterror + K1I * motor->dist_int + K1D * motor->dist_der;
+			float K1P = 0.01, K2P = 0.02;
+			float K1I = 0.02, K2I = 0.01;
+			float K1D = 0.005, K2D = 0.000;
+			float distspeed = K1P * disterror + K1I * motor->dist_int + K1D * motor->dist_der;
+			float diffspeed = K2P * differror + K2I * motor->diff_int + K2D * motor->diff_der;
 
-		motor_pwm(motor, distspeed + MIN_MOVEMENT);
+			motor_pwm(motor, distspeed - diffspeed + MIN_MOVEMENT);
+			motor_pwm(motor->other_motor, distspeed + diffspeed + MIN_MOVEMENT);
+		}
+		motor->updated += 1;
 
 		// double check the position if no change in a while
 		if (motor->delta ==0) {
@@ -415,7 +426,6 @@ void Speed_ISR_Callback(struct Motor *motor) {
 		}
 	}
 }
-
 // ----------------------PRIVATE----------------------
 // motor control
 
@@ -455,12 +465,20 @@ static void motor_init(struct Motor *motor) {
  */
 static void motor_reset(struct Motor *motor) {
 	motor->dist_int = 0;
+	motor->diff_int = 0;
 	motor->dist_der = 0;
+	motor->diff_der = 0;
 	motor->dist_pro = MOTOR_SPEED_CHECK;
+	motor->diff_pro = 0;
 
 	motor->speed_count = 0;
+	motor->updated = 0;
+
+	motor->delta = MOTOR_SPEED_CHECK;
 	motor->last_hall_count = 0;
-	motor->hall_count = 0;
+	motor->this_hall_count = 0;
+	motor->total_hall_count = 0;
+
 	if (motor->direction > 0) {
 		motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
 	} else {

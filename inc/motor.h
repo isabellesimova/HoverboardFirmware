@@ -69,14 +69,19 @@ struct Motor {
 	volatile float pwm;
 	volatile float ratio;
 	volatile int64_t delta;
-	volatile uint64_t last_hall_count;
-	volatile uint64_t hall_count;
+	volatile float last_hall_count;
+	volatile float this_hall_count;
+	volatile float total_hall_count;
+	volatile uint64_t updated;
 	volatile uint64_t speed_count;
 	volatile uint64_t hall_limit;
 
 	volatile float dist_int;
+	volatile float diff_int;
 	volatile float dist_der;
+	volatile float diff_der;
 	volatile float dist_pro;
+	volatile float diff_pro;
 
 	volatile uint16_t speed;
 	volatile int8_t direction; //+1 or -1
