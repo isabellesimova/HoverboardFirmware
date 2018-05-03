@@ -62,6 +62,7 @@ struct Motor_setup {
 struct Motor {
 	struct Motor_setup setup;
 	struct Motor* other_motor;
+
 	volatile uint32_t uwPeriodValue;
 	volatile uint8_t position; //hall
 	volatile uint8_t next_position; //hall
@@ -86,9 +87,6 @@ struct Motor {
 	volatile uint16_t speed;
 	volatile int8_t direction; //+1 or -1
 	volatile uint8_t stop; // 0 or 1
-
-	volatile float pos_increment; // 1 or 0.1
-	volatile float neg_increment; // 2 or 0.1
 
 	// pwm lines: +1, 0, or -1
 	volatile uint32_t PWM_DUTIES[3];

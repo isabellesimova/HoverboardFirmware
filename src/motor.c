@@ -434,9 +434,6 @@ void Speed_ISR_Callback(struct Motor *motor) {
 static void motor_init(struct Motor *motor) {
 
 	motor->speed = MIN_SPEED+1; //set it to something other than the MIN_SPEED
-	motor->pos_increment = 0.1; //backup values so it doesn't get stuck, shouldn't matter
-	motor->neg_increment = 0.1;
-
 	motor_speed(motor, MIN_SPEED);
 
 	motor->position = motor_get_position(motor);
@@ -535,22 +532,12 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 	}
 
 	if (old_speed != motor->speed) {
-		if (old_speed < motor->speed) {
-			motor->pos_increment = 0.5;
-			motor->neg_increment = 0.1;
-		} else if (old_speed > motor->speed) {
-			motor->pos_increment = 0.1;
-			motor->neg_increment = 2;
-		}
-
 		// set the register of the next thing
 		__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
 		__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), (motor->speed >> 4) - 1);
 	}
 
 	if (motor->stop == 1) {
-		motor->pos_increment = 0.5;
-		motor->neg_increment = 0.1;
 		motor_start(motor);
 	}
 
