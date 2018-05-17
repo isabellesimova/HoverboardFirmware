@@ -14,11 +14,11 @@ extern "C" {
 #include "stm32f1xx_hal.h"
 #include "config.h"
 
-#define PWM_MOTOR 25000			//PWM frequency in Hertz
-#define MIN_SPEED 11			//rotations per minute
+#define PWM_MOTOR 31250			//PWM frequency in Hertz
+#define MIN_SPEED 12			//rotations per minute
 #define MAX_SPEED 360
 #define NUM_PHASES 6
-#define DUTY_STEPS 16
+#define DUTY_STEPS 384
 #define PI 3.14159265358
 
 //non volatile stuff, constant things
@@ -74,8 +74,7 @@ struct Motor {
 	volatile float neg_increment; // 2 or 0.1
 
 	// pwm lines: +1, 0, or -1
-	volatile uint32_t PWM_DUTIES[3];
-	volatile uint32_t DUTY_LOOKUP[6][DUTY_STEPS];
+	volatile uint16_t DUTY_LOOKUP[DUTY_STEPS];
 
 	volatile int16_t timer_duty_cnt;
 };

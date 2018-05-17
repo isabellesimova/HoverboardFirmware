@@ -28,15 +28,6 @@
  */
 //#define BUZZER_START_DEBUG //comment out when not in use
 
-/* Pick a mode for control - trapezoidal or sinusoidal. Trapezoidal is simpler
- * and works with less logic. Sinusoidal is more complex but works better at low speeds.
- */
-#define TRAPEZOIDAL_CONTROL 0
-#define SINUSOIDAL_CONTROL 1
-#define CONTROL_METHOD TRAPEZOIDAL_CONTROL
-
-
-
 
 // --------------- WHEEL RELAETD ---------------
 /* WHEEL CONSTANTS
