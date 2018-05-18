@@ -43,6 +43,7 @@ static float BASE_DUTY_LOOKUP[DUTY_STEPS];
 // ----------------------PRIVATE----------------------
 // motor control
 static void motor_init(struct Motor *motor);
+static void motor_reset(struct Motor *motor);
 static void motor_start(struct Motor *motor);
 static void motor_speed(struct Motor *motor, int16_t rpm);
 static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t power);
@@ -135,6 +136,9 @@ void motors_setup_and_init() {
 	motor_R.setup.GPIO_HIGH_PORT = GPIOA;
 	motor_R.setup.GPIO_HIGH_CH_PINS = GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10;
 
+	motor_L.other_motor = &motor_R;
+	motor_R.other_motor = &motor_L;
+
 	motor_init(&motor_L);
 	motor_init(&motor_R);
 
@@ -179,16 +183,47 @@ void motors_speeds(int16_t l_rpm, int16_t r_rpm) {
 /* This is the interrupt function for whenever the hall sensor readings change.
  */
 void HALL_ISR_Callback(struct Motor *motor) {
+	// stop -- don't do the commutation
+	if (motor->stop) {
+		return;
+	}
 
+	// figure out how much it has already moved - expect it to be one, but just in case.
+	static int newPos;
+	if (motor->direction > 0) {
+		newPos = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
+	} else {
+		newPos = in_range(motor_get_position(motor) + motor->setup.OFFSET_NEG_HALL);
+	}
+
+	static int8_t diff;
+	diff = in_range((newPos - motor->position) * motor->direction);
+	if (diff > 3) {
+		diff = diff - 6;
+	}
+
+	motor->this_hall_count = motor->this_hall_count + diff;
+	motor->position = newPos;
+
+	// if you finish the spline, stop
+	// 0 means no limit
+	if (motor->hall_limit != 0 && motor->hall_limit <= motor->this_hall_count) {
+		motor_stop(motor);
+		return;
+	}
 }
 
 /* This is the interrupt function to change the duty cycle 16x per commutation phase.
  * Duration: ~15 microseconds
  */
 void Duty_ISR_Callback(struct Motor *motor) {
-	motor_set_pwm(motor, in_range_duty(motor, motor->timer_duty_cnt),
-			in_range_duty(motor, motor->timer_duty_cnt + DUTY_STEPS_LAG),
-			in_range_duty(motor, motor->timer_duty_cnt + DUTY_STEPS_LAG * 2));
+	if (motor->stop == 1) {
+		return;
+	}
+
+	motor_set_pwm(motor, in_range_duty(motor, motor->direction * motor->timer_duty_cnt + DUTY_STEPS),
+			in_range_duty(motor, motor->direction * motor->timer_duty_cnt + DUTY_STEPS + DUTY_STEPS_LAG),
+			in_range_duty(motor, motor->direction * motor->timer_duty_cnt + DUTY_STEPS + DUTY_STEPS_LAG * 2));
 	motor->timer_duty_cnt += 1;
 }
 
@@ -197,6 +232,27 @@ void Duty_ISR_Callback(struct Motor *motor) {
  * Duration: ~25 microseconds
  */
 void Speed_ISR_Callback(struct Motor *motor) {
+	if (motor->stop == 1) {
+		return;
+	}
+
+	motor->delta = motor->this_hall_count - motor->last_hall_count;
+	motor->last_hall_count = motor->this_hall_count;
+	motor->total_hall_count += motor->delta;
+
+	if (motor->delta < MOTOR_SPEED_CHECK) {
+		motor_pwm(motor, motor->pwm + 5);
+	} else if (motor->delta > MOTOR_SPEED_CHECK) {
+		motor_pwm(motor, motor->pwm - 2);
+	}
+
+	// double check the position if no change in a while
+	if (motor->delta ==0) {
+		HALL_ISR_Callback(motor);
+	}
+
+	__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), motor->speed - 1);
+	__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
 	motor->timer_duty_cnt = 0;
 	Duty_ISR_Callback(motor);
 }
@@ -214,9 +270,6 @@ static void motor_init(struct Motor *motor) {
 
 	motor->pwm = 0;
 
-	motor->pos_increment = 0;
-	motor->neg_increment = 0;
-
 	motor_TIM_PWM_init(motor);
 	motor_TIM_Duty_init(motor);
 	motor_TIM_Speed_init(motor);
@@ -228,14 +281,30 @@ static void motor_init(struct Motor *motor) {
 	motor->timer_duty_cnt = 0;
 }
 
+/* Reset the hall count for the wheel, and reset the current position.
+ */
+static void motor_reset(struct Motor *motor) {
+  motor->delta = MOTOR_SPEED_CHECK;
+  motor->last_hall_count = 0;
+  motor->this_hall_count = 0;
+  motor->total_hall_count = 0;
+
+  if (motor->direction > 0) {
+    motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
+  } else {
+    motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_NEG_HALL);
+  }
+}
+
 /* Start the motor by enabling the interrupts and
  * setting the duty cycles to 0.
  */
 static void motor_start(struct Motor *motor) {
+	motor_reset(motor);
 	motor_set_pwm(motor, 0, 0, 0);
 	HAL_NVIC_SetPriority(motor->setup.EXTI_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(motor->setup.EXTI_IRQn);
-	motor_pwm(motor,20);
+	motor_pwm(motor, 0);
 	motor_fets_on(motor);
 	motor->stop = 0;
 }
@@ -268,7 +337,6 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 
 	//1000000 microseconds / second * 60 seconds / minute
 	float tick_speed = 1000000 * 60 / (WHEEL_HALL_COUNTS * rpm);
-	uint16_t old_speed = motor->speed;
 
 	if (tick_speed < 0) {
 		motor->direction = -1 * motor->setup.OFFSET_DIR;
@@ -276,20 +344,6 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 	} else {
 		motor->direction = motor->setup.OFFSET_DIR;
 		motor->speed = (int16_t) tick_speed;
-	}
-
-	if (old_speed != motor->speed) {
-		if (old_speed < motor->speed) {
-			motor->pos_increment = 0.001;
-			motor->neg_increment = 0.1;
-		} else if (old_speed > motor->speed) {
-			motor->pos_increment = 0.001;
-			motor->neg_increment = 2;
-		}
-
-		// set the register of the next thing
-		__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), motor->speed - 1);
-		__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
 	}
 
 	if (motor->stop == 1) {
@@ -488,7 +542,6 @@ static void motor_TIM_PWM_init(struct Motor *motor) {
 	GPIO_InitStruct.Pin = motor->setup.GPIO_HIGH_CH_PINS;
 	HAL_GPIO_Init(motor->setup.GPIO_HIGH_PORT, &GPIO_InitStruct);
 
-	motor->setup.htim_pwm.Instance->CR1 = motor->setup.htim_speed.Instance->CR1 | TIM_CR1_ARPE_Msk;
 	motor->setup.htim_pwm.Init.Prescaler         = 0;
 	motor->setup.htim_pwm.Init.Period            = motor->uwPeriodValue;
 	motor->setup.htim_pwm.Init.ClockDivision     = 0;
@@ -544,7 +597,6 @@ static void motor_TIM_Duty_init(struct Motor *motor) {
 		__HAL_RCC_TIM7_CLK_ENABLE();
 
 	// wait until the the next event to update the preload shadow register
-	motor->setup.htim_duty.Instance->CR1 = motor->setup.htim_speed.Instance->CR1 | TIM_CR1_ARPE_Msk;
 	motor->setup.htim_duty.Init.Prescaler = (uint32_t) (((SystemCoreClock / 1000000) >> 6) - 1); // instructions per microsecond - 1/64 of speed
 	motor->setup.htim_duty.Init.Period = motor->speed - 1;
 	motor->setup.htim_duty.Init.ClockDivision = 0;
@@ -563,7 +615,6 @@ static void motor_TIM_Speed_init(struct Motor *motor) {
 	else if (motor->setup.htim_speed.Instance == TIM4)
 		__HAL_RCC_TIM4_CLK_ENABLE();
 
-	motor->setup.htim_speed.Instance->CR1 = motor->setup.htim_speed.Instance->CR1 | TIM_CR1_ARPE_Msk;
 	motor->setup.htim_speed.Init.Prescaler = (uint32_t) ((SystemCoreClock / 1000000) * 6 - 1); // instructions per microsecond
 	motor->setup.htim_speed.Init.Period = motor->speed - 1;
 	motor->setup.htim_speed.Init.ClockDivision = 0;

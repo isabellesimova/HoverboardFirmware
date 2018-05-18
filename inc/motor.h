@@ -15,11 +15,12 @@ extern "C" {
 #include "config.h"
 
 #define PWM_MOTOR 31250			//PWM frequency in Hertz
-#define MIN_SPEED 12			//rotations per minute
+#define MIN_SPEED 11			//rotations per minute
 #define MAX_SPEED 360
 #define NUM_PHASES 6
 #define DUTY_STEPS 384
 #define PI 3.14159265358
+#define MOTOR_SPEED_CHECK 6
 
 //non volatile stuff, constant things
 struct Motor_setup {
@@ -60,18 +61,30 @@ struct Motor_setup {
 // volatile variables that change on interrupts
 struct Motor {
 	struct Motor_setup setup;
+	struct Motor* other_motor;
 	volatile uint32_t uwPeriodValue;
 	volatile uint8_t position; //hall
 	volatile uint8_t next_position; //hall
 
 	volatile float pwm;
+	volatile float ratio;
+	volatile int64_t delta;
+	volatile float last_hall_count;
+	volatile float this_hall_count;
+	volatile float total_hall_count;
+	volatile uint64_t updated;
+	volatile uint64_t hall_limit;
+
+	volatile float dist_int;
+	volatile float diff_int;
+	volatile float dist_der;
+	volatile float diff_der;
+	volatile float dist_pro;
+	volatile float diff_pro;
 
 	volatile uint16_t speed;
 	volatile int8_t direction; //+1 or -1
 	volatile uint8_t stop; // 0 or 1
-
-	volatile float pos_increment; // 1 or 0.1
-	volatile float neg_increment; // 2 or 0.1
 
 	// pwm lines: +1, 0, or -1
 	volatile uint16_t DUTY_LOOKUP[DUTY_STEPS];
