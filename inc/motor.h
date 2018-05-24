@@ -13,6 +13,7 @@ extern "C" {
 
 #include "stm32f1xx_hal.h"
 #include "config.h"
+#include "constants.h"
 
 #define PWM_MOTOR 31250			//PWM frequency in Hertz
 #define MIN_SPEED 11			//rotations per minute
@@ -62,40 +63,39 @@ struct Motor_setup {
 struct Motor {
 	struct Motor_setup setup;
 	struct Motor* other_motor;
+
 	volatile uint32_t uwPeriodValue;
-	volatile uint8_t position; //hall
-	volatile uint8_t next_position; //hall
+	volatile float pwm_percent_period;
+	volatile uint16_t position; //hall
+	volatile uint16_t next_position; //hall
 
 	volatile float pwm;
+	volatile float new_pwm;
 	volatile float ratio;
 	volatile int64_t delta;
 	volatile float last_hall_count;
 	volatile float this_hall_count;
 	volatile float total_hall_count;
-	volatile uint64_t updated;
 	volatile uint64_t hall_limit;
-
-	volatile float dist_int;
-	volatile float diff_int;
-	volatile float dist_der;
-	volatile float diff_der;
-	volatile float dist_pro;
-	volatile float diff_pro;
 
 	volatile uint16_t speed;
 	volatile int8_t direction; //+1 or -1
-	volatile uint8_t stop; // 0 or 1
 
-	// pwm lines: +1, 0, or -1
-	volatile uint16_t DUTY_LOOKUP[DUTY_STEPS];
+	volatile uint16_t DUTY_LOOKUP_1[DUTY_STEPS];
+	volatile uint16_t DUTY_LOOKUP_2[DUTY_STEPS];
+	volatile uint16_t *DUTY_LOOKUP_POINTER_OLD;
+	volatile uint16_t *DUTY_LOOKUP_POINTER_NEW;
+	volatile uint8_t duty_updated;
 
 	volatile int16_t timer_duty_cnt;
+	volatile state state;
 };
 
 void motors_setup_and_init(void);
+void motors_speeds(int16_t l_rpm, int16_t r_rpm);
+void motors_pwms();
 void motors_stop();
 void motors_calibrate();
-void motors_speeds(int16_t l_rpm, int16_t r_rpm);
 
 void HALL_ISR_Callback(struct Motor *motor);
 void Duty_ISR_Callback(struct Motor *motor);

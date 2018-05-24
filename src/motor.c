@@ -13,6 +13,7 @@ extern volatile struct UART uart;
 struct Motor motor_L;
 struct Motor motor_R;
 
+extern uint32_t last_rx_time;
 extern volatile int8_t status;
 
 static const uint8_t HALL_LOOKUP[6] = {
@@ -36,14 +37,14 @@ static const uint32_t TIM_CHANNELS[3] = {
 
 static const int DUTY_STEPS_LAG = DUTY_STEPS/3; //a third of duty_steps
 static const float DUTY_SINUSOIDAL[DUTY_STEPS]= {
-		0.0, 0.00818, 0.01636, 0.02453, 0.0327, 0.04086, 0.04901, 0.05714, 0.06526, 0.07337, 0.08145, 0.08951, 0.09755, 0.10556, 0.11354, 0.12149, 0.12941, 0.13729, 0.14514, 0.15295, 0.16072, 0.16844, 0.17613, 0.18376, 0.19134, 0.19887, 0.20635, 0.21378, 0.22114, 0.22845, 0.2357, 0.24288, 0.25, 0.25705, 0.26403, 0.27095, 0.27779, 0.28455, 0.29124, 0.29785, 0.30438, 0.31083, 0.3172, 0.32348, 0.32967, 0.33578, 0.3418, 0.34772, 0.35355, 0.35929, 0.36493, 0.37048, 0.37592, 0.38126, 0.38651, 0.39164, 0.39668, 0.4016, 0.40642, 0.41113, 0.41573, 0.42022, 0.4246, 0.42886, 0.43301, 0.43705, 0.44096, 0.44476, 0.44844, 0.45199, 0.45543, 0.45875, 0.46194, 0.46501, 0.46795, 0.47077, 0.47347, 0.47603, 0.47847, 0.48078, 0.48296, 0.48502, 0.48694, 0.48873, 0.49039, 0.49192, 0.49332, 0.49459, 0.49572, 0.49672, 0.49759, 0.49833, 0.49893, 0.4994, 0.49973, 0.49993, 0.5, 0.49993, 0.49973, 0.4994, 0.49893, 0.49833, 0.49759, 0.49672, 0.49572, 0.49459, 0.49332, 0.49192, 0.49039, 0.48873, 0.48694, 0.48502, 0.48296, 0.48078, 0.47847, 0.47603, 0.47347, 0.47077, 0.46795, 0.46501, 0.46194, 0.45875, 0.45543, 0.45199, 0.44844, 0.44476, 0.44096, 0.43705, 0.43301, 0.42886, 0.4246, 0.42022, 0.41573, 0.41113, 0.40642, 0.4016, 0.39668, 0.39164, 0.38651, 0.38126, 0.37592, 0.37048, 0.36493, 0.35929, 0.35355, 0.34772, 0.3418, 0.33578, 0.32967, 0.32348, 0.3172, 0.31083, 0.30438, 0.29785, 0.29124, 0.28455, 0.27779, 0.27095, 0.26403, 0.25705, 0.25, 0.24288, 0.2357, 0.22845, 0.22114, 0.21378, 0.20635, 0.19887, 0.19134, 0.18376, 0.17613, 0.16844, 0.16072, 0.15295, 0.14514, 0.13729, 0.12941, 0.12149, 0.11354, 0.10556, 0.09755, 0.08951, 0.08145, 0.07337, 0.06526, 0.05714, 0.04901, 0.04086, 0.0327, 0.02453, 0.01636, 0.00818, 0.0, -0.00818, -0.01636, -0.02453, -0.0327, -0.04086, -0.04901, -0.05714, -0.06526, -0.07337, -0.08145, -0.08951, -0.09755, -0.10556, -0.11354, -0.12149, -0.12941, -0.13729, -0.14514, -0.15295, -0.16072, -0.16844, -0.17613, -0.18376, -0.19134, -0.19887, -0.20635, -0.21378, -0.22114, -0.22845, -0.2357, -0.24288, -0.25, -0.25705, -0.26403, -0.27095, -0.27779, -0.28455, -0.29124, -0.29785, -0.30438, -0.31083, -0.3172, -0.32348, -0.32967, -0.33578, -0.3418, -0.34772, -0.35355, -0.35929, -0.36493, -0.37048, -0.37592, -0.38126, -0.38651, -0.39164, -0.39668, -0.4016, -0.40642, -0.41113, -0.41573, -0.42022, -0.4246, -0.42886, -0.43301, -0.43705, -0.44096, -0.44476, -0.44844, -0.45199, -0.45543, -0.45875, -0.46194, -0.46501, -0.46795, -0.47077, -0.47347, -0.47603, -0.47847, -0.48078, -0.48296, -0.48502, -0.48694, -0.48873, -0.49039, -0.49192, -0.49332, -0.49459, -0.49572, -0.49672, -0.49759, -0.49833, -0.49893, -0.4994, -0.49973, -0.49993, -0.5, -0.49993, -0.49973, -0.4994, -0.49893, -0.49833, -0.49759, -0.49672, -0.49572, -0.49459, -0.49332, -0.49192, -0.49039, -0.48873, -0.48694, -0.48502, -0.48296, -0.48078, -0.47847, -0.47603, -0.47347, -0.47077, -0.46795, -0.46501, -0.46194, -0.45875, -0.45543, -0.45199, -0.44844, -0.44476, -0.44096, -0.43705, -0.43301, -0.42886, -0.4246, -0.42022, -0.41573, -0.41113, -0.40642, -0.4016, -0.39668, -0.39164, -0.38651, -0.38126, -0.37592, -0.37048, -0.36493, -0.35929, -0.35355, -0.34772, -0.3418, -0.33578, -0.32967, -0.32348, -0.3172, -0.31083, -0.30438, -0.29785, -0.29124, -0.28455, -0.27779, -0.27095, -0.26403, -0.25705, -0.25, -0.24288, -0.2357, -0.22845, -0.22114, -0.21378, -0.20635, -0.19887, -0.19134, -0.18376, -0.17613, -0.16844, -0.16072, -0.15295, -0.14514, -0.13729, -0.12941, -0.12149, -0.11354, -0.10556, -0.09755, -0.08951, -0.08145, -0.07337, -0.06526, -0.05714, -0.04901, -0.04086, -0.0327, -0.02453, -0.01636, -0.00818};
+		1.00000, 0.99993, 0.99973, 0.99940, 0.99893, 0.99833, 0.99759, 0.99672, 0.99572, 0.99459, 0.99332, 0.99192, 0.99039, 0.98873, 0.98694, 0.98502, 0.98296, 0.98078, 0.97847, 0.97603, 0.97347, 0.97077, 0.96795, 0.96501, 0.96194, 0.95875, 0.95543, 0.95199, 0.94844, 0.94476, 0.94096, 0.93705, 0.93301, 0.92886, 0.92460, 0.92022, 0.91573, 0.91113, 0.90642, 0.90160, 0.89668, 0.89164, 0.88651, 0.88126, 0.87592, 0.87048, 0.86493, 0.85929, 0.85355, 0.84772, 0.84180, 0.83578, 0.82967, 0.82348, 0.81720, 0.81083, 0.80438, 0.79785, 0.79124, 0.78455, 0.77779, 0.77095, 0.76403, 0.75705, 0.75000, 0.74288, 0.73570, 0.72845, 0.72114, 0.71378, 0.70635, 0.69887, 0.69134, 0.68376, 0.67613, 0.66844, 0.66072, 0.65295, 0.64514, 0.63729, 0.62941, 0.62149, 0.61354, 0.60556, 0.59755, 0.58951, 0.58145, 0.57337, 0.56526, 0.55714, 0.54901, 0.54086, 0.53270, 0.52453, 0.51636, 0.50818, 0.50000, 0.49182, 0.48364, 0.47547, 0.46730, 0.45914, 0.45099, 0.44286, 0.43474, 0.42663, 0.41855, 0.41049, 0.40245, 0.39444, 0.38646, 0.37851, 0.37059, 0.36271, 0.35486, 0.34705, 0.33928, 0.33156, 0.32387, 0.31624, 0.30866, 0.30113, 0.29365, 0.28622, 0.27886, 0.27155, 0.26430, 0.25712, 0.25000, 0.24295, 0.23597, 0.22905, 0.22221, 0.21545, 0.20876, 0.20215, 0.19562, 0.18917, 0.18280, 0.17652, 0.17033, 0.16422, 0.15820, 0.15228, 0.14645, 0.14071, 0.13507, 0.12952, 0.12408, 0.11874, 0.11349, 0.10836, 0.10332, 0.09840, 0.09358, 0.08887, 0.08427, 0.07978, 0.07540, 0.07114, 0.06699, 0.06295, 0.05904, 0.05524, 0.05156, 0.04801, 0.04457, 0.04125, 0.03806, 0.03499, 0.03205, 0.02923, 0.02653, 0.02397, 0.02153, 0.01922, 0.01704, 0.01498, 0.01306, 0.01127, 0.00961, 0.00808, 0.00668, 0.00541, 0.00428, 0.00328, 0.00241, 0.00167, 0.00107, 0.00060, 0.00027, 0.00007, 0.00000, 0.00007, 0.00027, 0.00060, 0.00107, 0.00167, 0.00241, 0.00328, 0.00428, 0.00541, 0.00668, 0.00808, 0.00961, 0.01127, 0.01306, 0.01498, 0.01704, 0.01922, 0.02153, 0.02397, 0.02653, 0.02923, 0.03205, 0.03499, 0.03806, 0.04125, 0.04457, 0.04801, 0.05156, 0.05524, 0.05904, 0.06295, 0.06699, 0.07114, 0.07540, 0.07978, 0.08427, 0.08887, 0.09358, 0.09840, 0.10332, 0.10836, 0.11349, 0.11874, 0.12408, 0.12952, 0.13507, 0.14071, 0.14645, 0.15228, 0.15820, 0.16422, 0.17033, 0.17652, 0.18280, 0.18917, 0.19562, 0.20215, 0.20876, 0.21545, 0.22221, 0.22905, 0.23597, 0.24295, 0.25000, 0.25712, 0.26430, 0.27155, 0.27886, 0.28622, 0.29365, 0.30113, 0.30866, 0.31624, 0.32387, 0.33156, 0.33928, 0.34705, 0.35486, 0.36271, 0.37059, 0.37851, 0.38646, 0.39444, 0.40245, 0.41049, 0.41855, 0.42663, 0.43474, 0.44286, 0.45099, 0.45914, 0.46730, 0.47547, 0.48364, 0.49182, 0.50000, 0.50818, 0.51636, 0.52453, 0.53270, 0.54086, 0.54901, 0.55714, 0.56526, 0.57337, 0.58145, 0.58951, 0.59755, 0.60556, 0.61354, 0.62149, 0.62941, 0.63729, 0.64514, 0.65295, 0.66072, 0.66844, 0.67613, 0.68376, 0.69134, 0.69887, 0.70635, 0.71378, 0.72114, 0.72845, 0.73570, 0.74288, 0.75000, 0.75705, 0.76403, 0.77095, 0.77779, 0.78455, 0.79124, 0.79785, 0.80438, 0.81083, 0.81720, 0.82348, 0.82967, 0.83578, 0.84180, 0.84772, 0.85355, 0.85929, 0.86493, 0.87048, 0.87592, 0.88126, 0.88651, 0.89164, 0.89668, 0.90160, 0.90642, 0.91113, 0.91573, 0.92022, 0.92460, 0.92886, 0.93301, 0.93705, 0.94096, 0.94476, 0.94844, 0.95199, 0.95543, 0.95875, 0.96194, 0.96501, 0.96795, 0.97077, 0.97347, 0.97603, 0.97847, 0.98078, 0.98296, 0.98502, 0.98694, 0.98873, 0.99039, 0.99192, 0.99332, 0.99459, 0.99572, 0.99672, 0.99759, 0.99833, 0.99893, 0.99940, 0.99973, 0.99993
+};
 static float BASE_DUTY_LOOKUP[DUTY_STEPS];
 
 
 // ----------------------PRIVATE----------------------
 // motor control
 static void motor_init(struct Motor *motor);
-static void motor_reset(struct Motor *motor);
 static void motor_start(struct Motor *motor);
 static void motor_speed(struct Motor *motor, int16_t rpm);
 static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t power);
@@ -62,13 +63,14 @@ static void motor_low_off(struct Motor *motor, uint8_t channel);
 static void motor_high_on(struct Motor *motor, uint8_t channel);
 static void motor_high_off(struct Motor *motor, uint8_t channel);
 static void motor_fets_on(struct Motor *motor);
+static void motor_fets_trapezoidal(struct Motor *motor, int high, int low);
 static void motor_fets_off(struct Motor *motor);
 static void motor_set_pwm(struct Motor *motor, float value0, float value1, float value2);
 
 // helper methods
 static int motor_get_position(struct Motor *motor);
 static int in_range(int x);
-static uint16_t in_range_duty(struct Motor *motor, int index);
+static uint16_t in_range_duty(struct Motor *motor, int channel, int index);
 
 // ----------------------PUBLIC----------------------
 /* Configure both motors and set them up.
@@ -142,11 +144,24 @@ void motors_setup_and_init() {
 	motor_init(&motor_L);
 	motor_init(&motor_R);
 
-	float y = motor_L.uwPeriodValue * 0.01;;
 	for (int i = 0; i < DUTY_STEPS; i++) {
-		BASE_DUTY_LOOKUP[i] = y * DUTY_SINUSOIDAL[i];
+		BASE_DUTY_LOOKUP[i] = motor_L.pwm_percent_period * DUTY_SINUSOIDAL[i];
 	}
 
+}
+
+/* Set the speed for both motors.
+ */
+void motors_speeds(int16_t l_rpm, int16_t r_rpm) {
+	motor_speed(&motor_L, l_rpm);
+	motor_speed(&motor_R, r_rpm);
+}
+
+/* Update the lookup pwm values for both tables
+ */
+void motors_pwms() {
+	motor_pwm(&motor_L, motor_L.new_pwm);
+	motor_pwm(&motor_R, motor_R.new_pwm);
 }
 
 /* Stop both motors.
@@ -172,19 +187,12 @@ void motors_calibrate() {
 	motor_calibrate(&motor_R, -1, 0);
 }
 
-/* Set the speed for both motors.
- */
-void motors_speeds(int16_t l_rpm, int16_t r_rpm) {
-	motor_speed(&motor_L, l_rpm);
-	motor_speed(&motor_R, r_rpm);
-}
-
 //-------------------------------interrupt callbacks-------------------------------
 /* This is the interrupt function for whenever the hall sensor readings change.
  */
 void HALL_ISR_Callback(struct Motor *motor) {
 	// stop -- don't do the commutation
-	if (motor->stop) {
+	if (motor->state == STOPPED) {
 		return;
 	}
 
@@ -204,6 +212,7 @@ void HALL_ISR_Callback(struct Motor *motor) {
 
 	motor->this_hall_count = motor->this_hall_count + diff;
 	motor->position = newPos;
+	motor->next_position = in_range(motor->position + motor->direction);
 
 	// if you finish the spline, stop
 	// 0 means no limit
@@ -211,19 +220,37 @@ void HALL_ISR_Callback(struct Motor *motor) {
 		motor_stop(motor);
 		return;
 	}
+
 }
 
 /* This is the interrupt function to change the duty cycle 16x per commutation phase.
  * Duration: ~15 microseconds
  */
 void Duty_ISR_Callback(struct Motor *motor) {
-	if (motor->stop == 1) {
+	if (motor->state == STOPPED) {
 		return;
 	}
 
-	motor_set_pwm(motor, in_range_duty(motor, motor->direction * motor->timer_duty_cnt + DUTY_STEPS),
-			in_range_duty(motor, motor->direction * motor->timer_duty_cnt + DUTY_STEPS + DUTY_STEPS_LAG),
-			in_range_duty(motor, motor->direction * motor->timer_duty_cnt + DUTY_STEPS + DUTY_STEPS_LAG * 2));
+	if (motor->state == STARTING) {
+		if (motor->timer_duty_cnt % 64 == 0) {
+			if (motor->total_hall_count >= 6 && motor->position == in_range(3+motor->direction)){
+				motor_fets_on(motor);
+				motor->state = SETTING_UP;
+				motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
+				__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), motor->speed - 1);
+				__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
+				motor->setup.htim_duty.Instance->CNT = 0;
+				motor->setup.htim_speed.Instance->CNT = 0;
+				motor->timer_duty_cnt = 0;
+				return;
+			}
+			motor_fets_trapezoidal(motor, REVERSE_HALL_LOOKUP[motor->position][0], REVERSE_HALL_LOOKUP[motor->position][2]);
+		}
+	} else {
+		motor_set_pwm(motor, in_range_duty(motor, 0, motor->timer_duty_cnt),
+				in_range_duty(motor, motor->direction, motor->timer_duty_cnt + DUTY_STEPS + DUTY_STEPS_LAG * motor->direction),
+				in_range_duty(motor, -motor->direction, motor->timer_duty_cnt + DUTY_STEPS + DUTY_STEPS_LAG * 2 * motor->direction));
+	}
 	motor->timer_duty_cnt += 1;
 }
 
@@ -232,7 +259,16 @@ void Duty_ISR_Callback(struct Motor *motor) {
  * Duration: ~25 microseconds
  */
 void Speed_ISR_Callback(struct Motor *motor) {
-	if (motor->stop == 1) {
+
+	// if no new data in a second, stop!!
+	if (HAL_GetTick() - last_rx_time > HEARTBEAT_PERIOD) {
+		motors_stop();
+		SET_ERROR_BIT(status, STATUS_HEARTBEAT_MISSING);
+	} else {
+		CLR_ERROR_BIT(status, STATUS_HEARTBEAT_MISSING);
+	}
+
+	if (motor->state == STOPPED) {
 		return;
 	}
 
@@ -240,10 +276,29 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	motor->last_hall_count = motor->this_hall_count;
 	motor->total_hall_count += motor->delta;
 
-	if (motor->delta < MOTOR_SPEED_CHECK) {
-		motor_pwm(motor, motor->pwm + 5);
-	} else if (motor->delta > MOTOR_SPEED_CHECK) {
-		motor_pwm(motor, motor->pwm - 2);
+
+	if (motor->state == STARTING) {
+		if (motor->delta == 0) {
+			motor->new_pwm = motor->pwm + 5;
+		} else if (motor->delta > 6) {
+			motor->new_pwm = motor->pwm - 1;
+		}
+	} else if (motor->state == SETTING_UP || motor->state == READY_TO_TRANSITION) {
+		motor->new_pwm = motor->pwm;
+	}
+	else if (motor->state == TRANSITIONING) {
+		if (motor->delta < MOTOR_SPEED_CHECK) {
+
+			motor->state = GOING;
+		} else if (motor->delta >= MOTOR_SPEED_CHECK) {
+			motor->new_pwm = motor->pwm - 2;
+		}
+	} else if (motor->state == GOING) {
+		if (motor->delta < MOTOR_SPEED_CHECK) {
+			motor->new_pwm = motor->pwm + 1;
+		} else if (motor->delta > MOTOR_SPEED_CHECK) {
+			motor->new_pwm = motor->pwm - 1;
+		}
 	}
 
 	// double check the position if no change in a while
@@ -254,7 +309,6 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), motor->speed - 1);
 	__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
 	motor->timer_duty_cnt = 0;
-	Duty_ISR_Callback(motor);
 }
 
 // ----------------------PRIVATE----------------------
@@ -269,6 +323,10 @@ static void motor_init(struct Motor *motor) {
 	motor->next_position = motor->position;
 
 	motor->pwm = 0;
+	motor->new_pwm = 0;
+
+	motor->DUTY_LOOKUP_POINTER_OLD = motor->DUTY_LOOKUP_1;
+	motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
 
 	motor_TIM_PWM_init(motor);
 	motor_TIM_Duty_init(motor);
@@ -277,36 +335,36 @@ static void motor_init(struct Motor *motor) {
 	motor_stop(motor);
 
 	motor->direction = 1;
-	motor->stop = 1;
+	motor->state = STOPPED;
 	motor->timer_duty_cnt = 0;
-}
-
-/* Reset the hall count for the wheel, and reset the current position.
- */
-static void motor_reset(struct Motor *motor) {
-  motor->delta = MOTOR_SPEED_CHECK;
-  motor->last_hall_count = 0;
-  motor->this_hall_count = 0;
-  motor->total_hall_count = 0;
-
-  if (motor->direction > 0) {
-    motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
-  } else {
-    motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_NEG_HALL);
-  }
 }
 
 /* Start the motor by enabling the interrupts and
  * setting the duty cycles to 0.
  */
 static void motor_start(struct Motor *motor) {
-	motor_reset(motor);
+	motor->delta = MOTOR_SPEED_CHECK;
+	motor->last_hall_count = 0;
+	motor->this_hall_count = 0;
+	motor->total_hall_count = 0;
+
+	if (motor->direction > 0) {
+		motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_POS_HALL);
+	} else {
+		motor->position = in_range(motor_get_position(motor) + motor->setup.OFFSET_NEG_HALL);
+	}
+
+	motor->state = STARTING;
 	motor_set_pwm(motor, 0, 0, 0);
-	HAL_NVIC_SetPriority(motor->setup.EXTI_IRQn, 0, 0);
+	motor_pwm(motor, 20);
+	motor->timer_duty_cnt = 0;
+
+	//enable timers
+	__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), motor->speed - 1);
+	__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
 	HAL_NVIC_EnableIRQ(motor->setup.EXTI_IRQn);
-	motor_pwm(motor, 0);
-	motor_fets_on(motor);
-	motor->stop = 0;
+	HAL_NVIC_EnableIRQ(motor->setup.TIM_SPEED_IRQn);
+	HAL_NVIC_EnableIRQ(motor->setup.TIM_DUTY_IRQn);
 }
 
 /* Set the speed for a motor by setting the timer to the right value.
@@ -346,7 +404,7 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 		motor->speed = (int16_t) tick_speed;
 	}
 
-	if (motor->stop == 1) {
+	if (motor->state == STOPPED) {
 		motor_start(motor);
 	}
 
@@ -456,21 +514,32 @@ static void motor_pwm(struct Motor *motor, float value_percent) {
 		CLR_ERROR_BIT(status, STATUS_MAX_POWER_REACHED);
 	}
 
-	motor->pwm = value_percent;
-	HAL_IWDG_Refresh(&hiwdg);   //819mS
-
-	for (i = 0; i < DUTY_STEPS; i++) {
-		motor->DUTY_LOOKUP[i] = (uint16_t)(BASE_DUTY_LOOKUP[i] * motor->pwm + motor->uwPeriodValue/2);
+	if (motor->pwm != value_percent) {
+		motor->pwm = value_percent;
+		if (motor->state == STARTING) {
+			for (i = 0; i < DUTY_STEPS; i++) {
+				motor->DUTY_LOOKUP_1[i] = (uint16_t)(motor->pwm * motor->pwm_percent_period);
+				motor->DUTY_LOOKUP_2[i] = (uint16_t)(motor->pwm * BASE_DUTY_LOOKUP[i] );
+			}
+		} else {
+			if (motor->DUTY_LOOKUP_POINTER_NEW == motor->DUTY_LOOKUP_1) {
+				for (i = 0; i < DUTY_STEPS; i++) {
+					motor->DUTY_LOOKUP_2[i] = (uint16_t)(motor->pwm * BASE_DUTY_LOOKUP[i]);
+				}
+			}
+		}
 	}
 }
 
 /* Stop everything: turn off all the fets, and set the PWM duty cycles to 0.
  */
 static void motor_stop(struct Motor *motor) {
-	motor->stop = 1;
+	motor->state = STOPPED;
 
 	motor_fets_off(motor);
 	HAL_NVIC_DisableIRQ(motor->setup.EXTI_IRQn);
+	HAL_NVIC_DisableIRQ(motor->setup.TIM_DUTY_IRQn);
+	HAL_NVIC_DisableIRQ(motor->setup.TIM_SPEED_IRQn);
 
 	__HAL_GPIO_EXTI_CLEAR_IT(motor->setup.HALL_PINS[0]);
 	__HAL_GPIO_EXTI_CLEAR_IT(motor->setup.HALL_PINS[1]);
@@ -523,11 +592,12 @@ static void motor_TIM_PWM_init(struct Motor *motor) {
 	motor_fets_off(motor);
 
 	motor->uwPeriodValue = (uint32_t) ((SystemCoreClock / PWM_MOTOR) - 1);
+	motor->pwm_percent_period = motor->uwPeriodValue * 0.01;
 
 	//LOW HALF
 	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
 	GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
-	GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+	GPIO_InitStruct.Pull = GPIO_PULLUP;
 	GPIO_InitStruct.Pin = motor->setup.GPIO_LOW_CH_PINS[0];
 	HAL_GPIO_Init(motor->setup.GPIO_LOW_PORTS[0], &GPIO_InitStruct);
 	GPIO_InitStruct.Pin = motor->setup.GPIO_LOW_CH_PINS[1];
@@ -583,7 +653,7 @@ static void motor_TIM_PWM_init(struct Motor *motor) {
 	motor_set_pwm(motor, 0, 0, 0);
 	motor_fets_on(motor);
 
-	motor->stop = 1;
+	motor->state = STOPPED;
 }
 
 /* Set up the timer to vary the different duty cycles in one commutation phase.
@@ -657,23 +727,35 @@ static void motor_high_off(struct Motor *motor, uint8_t channel) {
 /* Turn on all the mosfets of the half bridges
  * (By enabling the PWM and complementary PWM)
  */
-void motor_fets_on(struct Motor *motor) {
+static void motor_fets_on(struct Motor *motor) {
 	//--> CCXE = 1, CCXNE = 1 for X = 1,2,3
 	motor->setup.htim_pwm.Instance->CCER = motor->setup.htim_pwm.Instance->CCER | 0b010101010101;
+}
+
+/* Turn on all the mosfets of the half bridges
+ * (By enabling the PWM and complementary PWM)
+ */
+static void motor_fets_trapezoidal(struct Motor *motor, int high, int low) {
+	//--> CCXE = 1, CCXNE = 1 for X = 1,2,3
+	float pwm[3];
+	pwm[0] = pwm[1] = pwm[2] = motor->pwm * motor->pwm_percent_period;
+	motor_set_pwm(motor, pwm[0], pwm[1], pwm[2]);
+	int16_t bitmask = 1 << (high * 4) | (1 << (low * 4 + 2));
+	motor->setup.htim_pwm.Instance->CCER = bitmask | (motor->setup.htim_pwm.Instance->CCER & ~(0b010101010101));
 }
 
 /* Turn off all the mosfets of the half bridges
  * (By disabling the comparing for the PWM and complementary PWM)
  */
 
-void motor_fets_off(struct Motor *motor) {
+static void motor_fets_off(struct Motor *motor) {
 	//--> CCXE = 0, CCXNE = 0 for X = 1,2,3
 	motor->setup.htim_pwm.Instance->CCER = motor->setup.htim_pwm.Instance->CCER & ~(0b010101010101);
 }
 
 /* Set the PWM duty cycles.
  */
-void motor_set_pwm(struct Motor *motor, float value0, float value1, float value2) {
+static void motor_set_pwm(struct Motor *motor, float value0, float value1, float value2) {
 	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[0], value0);
 	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[1], value1);
 	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[2], value2);
@@ -700,9 +782,66 @@ static int in_range(int x) {
 	return mod_lookup_table[x + 6];
 }
 
-static uint16_t in_range_duty(struct Motor *motor, int index) {
+static uint16_t in_range_duty(struct Motor *motor, int channel, int index) {
 	while (index >= DUTY_STEPS) {
 		index-= DUTY_STEPS;
 	}
-	return motor->DUTY_LOOKUP[index];
+
+	uint16_t value_to_return = 0;
+	if (motor->state == SETTING_UP || motor->state == READY_TO_TRANSITION ) {
+		if (channel == 0) {
+			if (index == 0) {
+				if (motor->state == SETTING_UP) {
+					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_2;
+					motor->state = READY_TO_TRANSITION;
+				} else if (motor->state == READY_TO_TRANSITION) {
+					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
+					motor->state = TRANSITIONING;
+				}
+			}
+			value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+		} else if (channel == 1) {
+			if (index < DUTY_STEPS/3) {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+			} else {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+			}
+			motor->DUTY_LOOKUP_POINTER_OLD[index] = motor->DUTY_LOOKUP_POINTER_NEW[index];
+		} else {
+			if (index < DUTY_STEPS * 2/3) {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+			} else {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+			}
+		}
+	} else {
+		if (channel == 0) {
+			if (index > DUTY_STEPS/2) {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+			} else {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+			}
+		} else if (channel == 1) {
+			if (index == DUTY_STEPS/2) {
+				if (motor->DUTY_LOOKUP_POINTER_NEW == motor->DUTY_LOOKUP_2) {
+					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
+				} else if (motor->DUTY_LOOKUP_1[0] != motor->DUTY_LOOKUP_2[0]) {
+					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_2;
+				}
+			}
+			if (index < DUTY_STEPS/3 || index > DUTY_STEPS/2) {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+			} else {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+			}
+		} else {
+			if (index < DUTY_STEPS * 2/3 && index > DUTY_STEPS/2) {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+			} else {
+				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+			}
+			motor->DUTY_LOOKUP_POINTER_OLD[index] = motor->DUTY_LOOKUP_POINTER_NEW[index];
+		}
+	}
+	return value_to_return;
 }

@@ -69,6 +69,9 @@ int main(void)
 	last_pwr_time = HAL_GetTick();
 
 	while (1) {
+		// update pwm if it's changed
+		motors_pwms();
+
 		time = HAL_GetTick();
 
 		// get the commands every RX_WAIT_PERIOD ms
@@ -106,14 +109,6 @@ static void receive_data() {
 	if (uart_rx_status == 1) {
 		last_rx_time = HAL_GetTick();
 		motors_speeds(speeds[0], speeds[1]);
-	}
-
-	// if no new data in a second, stop!!
-	if (HAL_GetTick() - last_rx_time > HEARTBEAT_PERIOD) {
-		motors_stop();
-		SET_ERROR_BIT(status, STATUS_HEARTBEAT_MISSING);
-	} else {
-		CLR_ERROR_BIT(status, STATUS_HEARTBEAT_MISSING);
 	}
 }
 
