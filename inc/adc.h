@@ -33,10 +33,7 @@ struct ADC {
 	volatile uint16_t data[2];
 };
 
-// ----------------------PUBLIC----------------------
 void adcs_setup_and_init(void);
-
-// ------------ROLLING_AVG----------------
 float get_battery_volt(void);
 float get_motor_current(struct ADC *adc);
 

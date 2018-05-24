@@ -18,10 +18,12 @@ extern "C" {
 #define PWM_MOTOR 31250			//PWM frequency in Hertz
 #define MIN_SPEED 11			//rotations per minute
 #define MAX_SPEED 360
-#define NUM_PHASES 6
 #define DUTY_STEPS 384
-#define PI 3.14159265358
-#define MOTOR_SPEED_CHECK 6
+
+//state machine
+enum MOTOR_STATE {
+  STARTING, SETTING_UP, READY_TO_TRANSITION, TRANSITIONING, GOING, STOPPED
+};
 
 //non volatile stuff, constant things
 struct Motor_setup {
@@ -63,15 +65,16 @@ struct Motor_setup {
 struct Motor {
 	struct Motor_setup setup;
 	struct Motor* other_motor;
-
 	volatile uint32_t uwPeriodValue;
 	volatile float pwm_percent_period;
+
+	volatile enum MOTOR_STATE state;
 	volatile uint16_t position; //hall
-	volatile uint16_t next_position; //hall
 
 	volatile float pwm;
 	volatile float new_pwm;
 	volatile float ratio;
+
 	volatile int64_t delta;
 	volatile float last_hall_count;
 	volatile float this_hall_count;
@@ -81,14 +84,14 @@ struct Motor {
 	volatile uint16_t speed;
 	volatile int8_t direction; //+1 or -1
 
+	//this is to keep track of an "old" set of duty cycles and a "new set", so that all three channels of the motor can transition smoothly
+	//check out in_range_duty function for more details
 	volatile uint16_t DUTY_LOOKUP_1[DUTY_STEPS];
 	volatile uint16_t DUTY_LOOKUP_2[DUTY_STEPS];
 	volatile uint16_t *DUTY_LOOKUP_POINTER_OLD;
 	volatile uint16_t *DUTY_LOOKUP_POINTER_NEW;
-	volatile uint8_t duty_updated;
 
 	volatile int16_t timer_duty_cnt;
-	volatile state state;
 };
 
 void motors_setup_and_init(void);

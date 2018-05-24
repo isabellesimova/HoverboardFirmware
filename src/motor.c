@@ -16,6 +16,9 @@ struct Motor motor_R;
 extern uint32_t last_rx_time;
 extern volatile int8_t status;
 
+// don't change this -- standard for a 3 phase BLDC motor
+#define NUM_PHASES 6
+
 static const uint8_t HALL_LOOKUP[6] = {
 		1, 5, 0, 3, 2, 4
 };
@@ -47,7 +50,7 @@ static float BASE_DUTY_LOOKUP[DUTY_STEPS];
 static void motor_init(struct Motor *motor);
 static void motor_start(struct Motor *motor);
 static void motor_speed(struct Motor *motor, int16_t rpm);
-static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t power);
+static void motor_calibrate(struct Motor *motor, int8_t calibration_dir);
 static void motor_pwm(struct Motor *motor, float value_percent);
 static void motor_stop(struct Motor *motor);
 
@@ -58,14 +61,10 @@ static void motor_TIM_Duty_init(struct Motor *motor);
 static void motor_TIM_Speed_init(struct Motor *motor);
 
 // mosfet control
-static void motor_low_on(struct Motor *motor, uint8_t channel);
-static void motor_low_off(struct Motor *motor, uint8_t channel);
-static void motor_high_on(struct Motor *motor, uint8_t channel);
-static void motor_high_off(struct Motor *motor, uint8_t channel);
+static void motor_set_pwm(struct Motor *motor, float value0, float value1, float value2);
 static void motor_fets_on(struct Motor *motor);
 static void motor_fets_trapezoidal(struct Motor *motor, int high, int low);
 static void motor_fets_off(struct Motor *motor);
-static void motor_set_pwm(struct Motor *motor, float value0, float value1, float value2);
 
 // helper methods
 static int motor_get_position(struct Motor *motor);
@@ -147,7 +146,6 @@ void motors_setup_and_init() {
 	for (int i = 0; i < DUTY_STEPS; i++) {
 		BASE_DUTY_LOOKUP[i] = motor_L.pwm_percent_period * DUTY_SINUSOIDAL[i];
 	}
-
 }
 
 /* Set the speed for both motors.
@@ -180,11 +178,15 @@ void motors_calibrate() {
 	HAL_NVIC_DisableIRQ(motor_R.setup.TIM_DUTY_IRQn);
 	HAL_NVIC_DisableIRQ(motor_R.setup.TIM_SPEED_IRQn);
 
-	motor_calibrate(&motor_L, 1, 0);
-	motor_calibrate(&motor_L, -1, 0);
+	//just in case
+	motor_L.pwm = 0;
+	motor_R.pwm = 0;
 
-	motor_calibrate(&motor_R, 1, 0);
-	motor_calibrate(&motor_R, -1, 0);
+	motor_calibrate(&motor_L, 1);
+	motor_calibrate(&motor_L, -1);
+
+	motor_calibrate(&motor_R, 1);
+	motor_calibrate(&motor_R, -1);
 }
 
 //-------------------------------interrupt callbacks-------------------------------
@@ -212,7 +214,6 @@ void HALL_ISR_Callback(struct Motor *motor) {
 
 	motor->this_hall_count = motor->this_hall_count + diff;
 	motor->position = newPos;
-	motor->next_position = in_range(motor->position + motor->direction);
 
 	// if you finish the spline, stop
 	// 0 means no limit
@@ -233,16 +234,19 @@ void Duty_ISR_Callback(struct Motor *motor) {
 
 	if (motor->state == STARTING) {
 		if (motor->timer_duty_cnt % 64 == 0) {
-			if (motor->total_hall_count >= 6 && motor->position == in_range(3+motor->direction)){
-				motor_fets_on(motor);
-				motor->state = SETTING_UP;
-				motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
-				__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), motor->speed - 1);
-				__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
-				motor->setup.htim_duty.Instance->CNT = 0;
-				motor->setup.htim_speed.Instance->CNT = 0;
-				motor->timer_duty_cnt = 0;
-				return;
+			if (motor->total_hall_count >= NUM_PHASES && motor->other_motor->total_hall_count >= NUM_PHASES) {
+				if ((motor->direction == -1 && motor->position == 3) ||
+					(motor->direction == 1 && motor->position == 4)) {
+					motor_fets_on(motor);
+					motor->state = SETTING_UP;
+					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
+					__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), motor->speed - 1);
+					__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_speed), motor->speed - 1);
+					motor->setup.htim_duty.Instance->CNT = 0;
+					motor->setup.htim_speed.Instance->CNT = 0;
+					motor->timer_duty_cnt = 0;
+					return;
+				}
 			}
 			motor_fets_trapezoidal(motor, REVERSE_HALL_LOOKUP[motor->position][0], REVERSE_HALL_LOOKUP[motor->position][2]);
 		}
@@ -276,29 +280,38 @@ void Speed_ISR_Callback(struct Motor *motor) {
 	motor->last_hall_count = motor->this_hall_count;
 	motor->total_hall_count += motor->delta;
 
+	switch(motor->state) {
+		case(STARTING):
+			if (motor->delta == 0) {
+				motor->new_pwm = motor->pwm + 5;
+			} else if (motor->delta > 6) {
+				motor->new_pwm = motor->pwm - 1;
+			}
+			break;
 
-	if (motor->state == STARTING) {
-		if (motor->delta == 0) {
-			motor->new_pwm = motor->pwm + 5;
-		} else if (motor->delta > 6) {
-			motor->new_pwm = motor->pwm - 1;
-		}
-	} else if (motor->state == SETTING_UP || motor->state == READY_TO_TRANSITION) {
-		motor->new_pwm = motor->pwm;
-	}
-	else if (motor->state == TRANSITIONING) {
-		if (motor->delta < MOTOR_SPEED_CHECK) {
+		case(SETTING_UP):
+		case(READY_TO_TRANSITION):
+			motor->new_pwm = motor->pwm;
+			break;
 
-			motor->state = GOING;
-		} else if (motor->delta >= MOTOR_SPEED_CHECK) {
-			motor->new_pwm = motor->pwm - 2;
-		}
-	} else if (motor->state == GOING) {
-		if (motor->delta < MOTOR_SPEED_CHECK) {
-			motor->new_pwm = motor->pwm + 1;
-		} else if (motor->delta > MOTOR_SPEED_CHECK) {
-			motor->new_pwm = motor->pwm - 1;
-		}
+		case(TRANSITIONING):
+			if (motor->delta < NUM_PHASES) {
+				motor->state = GOING;
+			} else if (motor->delta >= NUM_PHASES) {
+				motor->new_pwm = motor->pwm - 1;
+			}
+		break;
+
+		case(GOING):
+			if (motor->delta < NUM_PHASES) {
+				motor->new_pwm = motor->pwm + 1;
+			} else if (motor->delta > NUM_PHASES) {
+				motor->new_pwm = motor->pwm - 1;
+			}
+		break;
+
+		case(STOPPED):
+			return;
 	}
 
 	// double check the position if no change in a while
@@ -320,7 +333,6 @@ static void motor_init(struct Motor *motor) {
 	motor_speed(motor, MIN_SPEED);
 
 	motor->position = motor_get_position(motor);
-	motor->next_position = motor->position;
 
 	motor->pwm = 0;
 	motor->new_pwm = 0;
@@ -339,11 +351,12 @@ static void motor_init(struct Motor *motor) {
 	motor->timer_duty_cnt = 0;
 }
 
+
 /* Start the motor by enabling the interrupts and
  * setting the duty cycles to 0.
  */
 static void motor_start(struct Motor *motor) {
-	motor->delta = MOTOR_SPEED_CHECK;
+	motor->delta = NUM_PHASES;
 	motor->last_hall_count = 0;
 	motor->this_hall_count = 0;
 	motor->total_hall_count = 0;
@@ -356,7 +369,8 @@ static void motor_start(struct Motor *motor) {
 
 	motor->state = STARTING;
 	motor_set_pwm(motor, 0, 0, 0);
-	motor_pwm(motor, 20);
+	motor->pwm = 20;
+	motor->new_pwm = 20;
 	motor->timer_duty_cnt = 0;
 
 	//enable timers
@@ -366,6 +380,7 @@ static void motor_start(struct Motor *motor) {
 	HAL_NVIC_EnableIRQ(motor->setup.TIM_SPEED_IRQn);
 	HAL_NVIC_EnableIRQ(motor->setup.TIM_DUTY_IRQn);
 }
+
 
 /* Set the speed for a motor by setting the timer to the right value.
  * If the speed is out of range, one of the error bits is set.
@@ -412,31 +427,21 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 
 /* Calibrate a wheel by slowly increasing the pwm duty cycle until it moves just enough.
  */
-static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t power) {
-
+static void motor_calibrate(struct Motor *motor, int8_t calibration_dir) {
 	HAL_IWDG_Refresh(&hiwdg);   //819mS
 
 	uint8_t calibrate_positions[NUM_PHASES];
 	int i, j, offset_dir;
 	int delay = 200;
 
-	motor_low_off(motor, 0);
-	motor_low_off(motor, 1);
-	motor_low_off(motor, 2);
-	motor_high_off(motor, 0);
-	motor_high_off(motor, 1);
-	motor_high_off(motor, 2);
-
 	// oh god something is broken why is the power ramping up so high, emergency exit
-	if (power > 100) {
+	if (motor->pwm > MAX_POWER_PERCENT ) {
+		motor->pwm = 0;
 		motor_set_pwm(motor, 0, 0, 0);
-		while (!Uart_is_TX_free());
-		sprintf((char *) &uart.TX_buffer[0], "max limited power reached, probably something is wrong\n");
-		Uart_TX((char *) &uart.TX_buffer[0]);
+		SET_ERROR_BIT(status, STATUS_MAX_POWER_REACHED);
 		return;
 	}
-
-	motor_set_pwm(motor, power, power, power);
+	CLR_ERROR_BIT(status, STATUS_MAX_POWER_REACHED);
 
 	//let it warm up through the first cycle
 	for (i = 0; i < 2; i++) {
@@ -445,11 +450,7 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t
 		for (j = 0; j < NUM_PHASES; j++) {
 			HAL_IWDG_Refresh(&hiwdg);   //819mS
 
-			motor_high_off(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * (j - 1))][0]);
-			motor_low_off(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * (j - 1))][2]);
-
-			motor_high_on(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * j)][0]);
-			motor_low_on(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * j)][2]);
+			motor_fets_trapezoidal(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*j)][0], REVERSE_HALL_LOOKUP[in_range(calibration_dir*j)][2]);
 
 			delay_ms(delay);
 			calibrate_positions[j] = motor_get_position(motor);
@@ -459,18 +460,11 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t
 
 		// didn't really move, ramp up power
 		if (offset_dir == 0) {
-			motor_calibrate(motor, calibration_dir, power + 10);
+			motor->pwm = motor->pwm + 10;
+			motor_calibrate(motor, calibration_dir);
 			return;
 		}
 	}
-
-	motor_low_off(motor, 0);
-	motor_low_off(motor, 1);
-	motor_low_off(motor, 2);
-	motor_high_off(motor, 0);
-	motor_high_off(motor, 1);
-	motor_high_off(motor, 2);
-	motor_set_pwm(motor, 0, 0, 0);
 
 	if (offset_dir > NUM_PHASES / 2) {
 		offset_dir -= NUM_PHASES;
@@ -480,21 +474,24 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t
 
 	// offset direction should be 1 or -1
 	if (offset_dir != 1 && offset_dir != -1) {
-		motor_calibrate(motor, calibration_dir, power + 1);
+		motor->pwm = motor->pwm + 1;
+		motor_calibrate(motor, calibration_dir);
 		return;
 	}
 
 	// make sure all the offsets are right
 	for (i = 0; i < NUM_PHASES - 1; i++) {
 		if (in_range(calibrate_positions[i + 1] - calibrate_positions[i]) != in_range(offset_dir)) {
-			motor_calibrate(motor, calibration_dir, power + 1);
+			motor->pwm = motor->pwm + 1;
+			motor_calibrate(motor, calibration_dir);
 			return;
 		}
 	}
 
+	motor->pwm = 0;
 	while (!Uart_is_TX_free());
-	sprintf((char *) &uart.TX_buffer[0], "%c%+d: %d\n", motor->setup.side, offset_dir, in_range(-calibrate_positions[NUM_PHASES - 1]));
-	Uart_TX((char *) &uart.TX_buffer[0]);
+	sprintf((char *)&uart.TX_buffer[0], "{\"%c%+d\": %d}\n", motor->setup.side, offset_dir, in_range(-calibrate_positions[NUM_PHASES - 1]));
+	Uart_TX((char *)&uart.TX_buffer[0]);
 }
 
 /* Set the pwm for a motor - calculate what the duty cycle values should
@@ -650,9 +647,6 @@ static void motor_TIM_PWM_init(struct Motor *motor) {
 	HAL_TIM_PWM_Start(&(motor->setup.htim_pwm), TIM_CHANNEL_2);         //CH2
 	HAL_TIM_PWM_Start(&(motor->setup.htim_pwm), TIM_CHANNEL_3);         //CH3
 
-	motor_set_pwm(motor, 0, 0, 0);
-	motor_fets_on(motor);
-
 	motor->state = STOPPED;
 }
 
@@ -698,30 +692,12 @@ static void motor_TIM_Speed_init(struct Motor *motor) {
 // ----------------------PRIVATE----------------------
 // mosfet functions
 
-/* Turn on the lower mosfet of the half bridge of the corresponding channel.
+/* Set the PWM duty cycle for whatever channel.
  */
-static void motor_low_on(struct Motor *motor, uint8_t channel) {
-	(motor->setup.GPIO_LOW_PORTS[channel])->BSRR = ((uint32_t) motor->setup.GPIO_LOW_CH_PINS[channel]) << 16;
-}
-
-/* Turn off the lower mosfet of the half bridge of the corresponding channel.
- */
-static void motor_low_off(struct Motor *motor, uint8_t channel) {
-	(motor->setup.GPIO_LOW_PORTS[channel])->BSRR = motor->setup.GPIO_LOW_CH_PINS[channel];
-}
-
-/* Turn on the upper mosfet of the half bridge of the corresponding channel.
- * (By enabling the comparing for the PWM)/
- */
-static void motor_high_on(struct Motor *motor, uint8_t channel) {
-	motor->setup.htim_pwm.Instance->CCER = motor->setup.htim_pwm.Instance->CCER | (1 << (channel * 4));  //--> CCXE = 1
-}
-
-/* Turn off the upper mosfet of the half bridge of the corresponding channel.
- * (By disabling the comparing for the PWM)
- */
-static void motor_high_off(struct Motor *motor, uint8_t channel) {
-	motor->setup.htim_pwm.Instance->CCER = motor->setup.htim_pwm.Instance->CCER & ~(1 << (channel * 4));  //--> CCXE = 0
+static void motor_set_pwm(struct Motor *motor, float value0, float value1, float value2) {
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[0], value0);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[1], value1);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[2], value2);
 }
 
 /* Turn on all the mosfets of the half bridges
@@ -747,18 +723,9 @@ static void motor_fets_trapezoidal(struct Motor *motor, int high, int low) {
 /* Turn off all the mosfets of the half bridges
  * (By disabling the comparing for the PWM and complementary PWM)
  */
-
 static void motor_fets_off(struct Motor *motor) {
 	//--> CCXE = 0, CCXNE = 0 for X = 1,2,3
 	motor->setup.htim_pwm.Instance->CCER = motor->setup.htim_pwm.Instance->CCER & ~(0b010101010101);
-}
-
-/* Set the PWM duty cycles.
- */
-static void motor_set_pwm(struct Motor *motor, float value0, float value1, float value2) {
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[0], value0);
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[1], value1);
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[2], value2);
 }
 
 // ----------------------PRIVATE----------------------
@@ -782,66 +749,85 @@ static int in_range(int x) {
 	return mod_lookup_table[x + 6];
 }
 
+/* Effectively finds the pwm duty cycle by taking the index and modding it by DUTY_STEPS (without doing any division).
+ * Also takes into account an old and a new duty cycle to keep the sine waves continuous.
+ * For each channel, the sine wave will only change to a newer duty cycle when it hits a common value.
+ * When SETTING_UP or READY_TO_TRANSITION, it will hold the sin pwm at the max (held from trapezoidal control) until the offset is reached.
+ * Afterward, the newer duty cycle will be transitioned for each channel when it hits 0% duty cycle in the sine wave.
+ */
 static uint16_t in_range_duty(struct Motor *motor, int channel, int index) {
 	while (index >= DUTY_STEPS) {
 		index-= DUTY_STEPS;
 	}
 
 	uint16_t value_to_return = 0;
-	if (motor->state == SETTING_UP || motor->state == READY_TO_TRANSITION ) {
-		if (channel == 0) {
-			if (index == 0) {
-				if (motor->state == SETTING_UP) {
-					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_2;
-					motor->state = READY_TO_TRANSITION;
-				} else if (motor->state == READY_TO_TRANSITION) {
-					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
-					motor->state = TRANSITIONING;
+
+	switch(motor->state) {
+		case(STARTING):
+			break;
+
+		case(SETTING_UP):
+		case(READY_TO_TRANSITION):
+			if (channel == 0) {
+				if (index == 0) {
+					if (motor->state == SETTING_UP) {
+						motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_2;
+						motor->state = READY_TO_TRANSITION;
+					} else if (motor->state == READY_TO_TRANSITION) {
+						motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
+						motor->state = TRANSITIONING;
+					}
+				}
+				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+			} else if (channel == 1) {
+				if (index < DUTY_STEPS/3) {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+				} else {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+				}
+				motor->DUTY_LOOKUP_POINTER_OLD[index] = motor->DUTY_LOOKUP_POINTER_NEW[index];
+			} else {
+				if (index < DUTY_STEPS * 2/3) {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+				} else {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
 				}
 			}
-			value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
-		} else if (channel == 1) {
-			if (index < DUTY_STEPS/3) {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
-			} else {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
-			}
-			motor->DUTY_LOOKUP_POINTER_OLD[index] = motor->DUTY_LOOKUP_POINTER_NEW[index];
-		} else {
-			if (index < DUTY_STEPS * 2/3) {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
-			} else {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
-			}
-		}
-	} else {
-		if (channel == 0) {
-			if (index > DUTY_STEPS/2) {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
-			} else {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
-			}
-		} else if (channel == 1) {
-			if (index == DUTY_STEPS/2) {
-				if (motor->DUTY_LOOKUP_POINTER_NEW == motor->DUTY_LOOKUP_2) {
-					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
-				} else if (motor->DUTY_LOOKUP_1[0] != motor->DUTY_LOOKUP_2[0]) {
-					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_2;
+			break;
+
+		case(TRANSITIONING):
+		case(GOING):
+			if (channel == 0) {
+				if (index > DUTY_STEPS/2) {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+				} else {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
 				}
-			}
-			if (index < DUTY_STEPS/3 || index > DUTY_STEPS/2) {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+			} else if (channel == 1) {
+				if (index == DUTY_STEPS/2) {
+					if (motor->DUTY_LOOKUP_POINTER_NEW == motor->DUTY_LOOKUP_2) {
+						motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
+					} else if (motor->DUTY_LOOKUP_1[0] != motor->DUTY_LOOKUP_2[0]) {
+						motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_2;
+					}
+				}
+				if (index < DUTY_STEPS/3 || index > DUTY_STEPS/2) {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+				} else {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+				}
 			} else {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+				if (index < DUTY_STEPS * 2/3 && index > DUTY_STEPS/2) {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
+				} else {
+					value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
+				}
+				motor->DUTY_LOOKUP_POINTER_OLD[index] = motor->DUTY_LOOKUP_POINTER_NEW[index];
 			}
-		} else {
-			if (index < DUTY_STEPS * 2/3 && index > DUTY_STEPS/2) {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_NEW[index];
-			} else {
-				value_to_return = motor->DUTY_LOOKUP_POINTER_OLD[index];
-			}
-			motor->DUTY_LOOKUP_POINTER_OLD[index] = motor->DUTY_LOOKUP_POINTER_NEW[index];
-		}
+			break;
+
+		case(STOPPED):
+			break;
 	}
 	return value_to_return;
 }

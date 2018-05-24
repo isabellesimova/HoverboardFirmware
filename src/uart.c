@@ -11,6 +11,7 @@
 // ----------------------PRIVATE----------------------
 static int process_frame(uint8_t start, uint8_t length);
 
+// ----------------------PUBLIC----------------------
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;

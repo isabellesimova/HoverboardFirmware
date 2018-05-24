@@ -16,12 +16,6 @@
 #define STATUS_UNKNOWN_1			6 //can set this to any other error status
 #define STATUS_UNKNOWN_2    		7 //can set this to any other error status
 
-
-enum state {
-  STARTING, SETTING_UP, READY_TO_TRANSITION, TRANSITIONING, GOING, STOPPED
-};
-typedef enum state state;
-
 /* BIT OPERATOINS
  * Methods to set, clear, or check if an error bit is set.
  */
