@@ -69,6 +69,7 @@ struct Motor {
 	volatile float pwm_percent_period;
 
 	volatile enum MOTOR_STATE state;
+	volatile uint16_t period_count; //hall
 	volatile uint16_t position; //hall
 
 	volatile float pwm;
@@ -82,6 +83,7 @@ struct Motor {
 	volatile uint64_t hall_limit;
 
 	volatile uint16_t speed;
+	volatile uint16_t target_speed;
 	volatile int8_t direction; //+1 or -1
 
 	//this is to keep track of an "old" set of duty cycles and a "new set", so that all three channels of the motor can transition smoothly

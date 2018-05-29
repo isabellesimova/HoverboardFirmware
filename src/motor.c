@@ -104,8 +104,7 @@ void motors_setup_and_init() {
 	motor_L.setup.GPIO_LOW_CH_PINS[2] = GPIO_PIN_1;
 
 	motor_L.setup.GPIO_HIGH_PORT = GPIOC;
-	motor_L.setup.GPIO_HIGH_CH_PINS = GPIO_PIN_6|GPIO_PIN_7|GPIO_PIN_8;
-
+	motor_L.setup.GPIO_HIGH_CH_PINS = GPIO_PIN_6 | GPIO_PIN_7 | GPIO_PIN_8;
 
 	//motor R config
 	motor_R.setup.side = 'R';
@@ -135,7 +134,7 @@ void motors_setup_and_init() {
 	motor_R.setup.GPIO_LOW_CH_PINS[2] = GPIO_PIN_15;
 
 	motor_R.setup.GPIO_HIGH_PORT = GPIOA;
-	motor_R.setup.GPIO_HIGH_CH_PINS = GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10;
+	motor_R.setup.GPIO_HIGH_CH_PINS = GPIO_PIN_8 | GPIO_PIN_9 | GPIO_PIN_10;
 
 	motor_L.other_motor = &motor_R;
 	motor_R.other_motor = &motor_L;
@@ -234,9 +233,8 @@ void Duty_ISR_Callback(struct Motor *motor) {
 
 	if (motor->state == STARTING) {
 		if (motor->timer_duty_cnt % 64 == 0) {
-			if (motor->total_hall_count >= NUM_PHASES && motor->other_motor->total_hall_count >= NUM_PHASES) {
-				if ((motor->direction == -1 && motor->position == 3) ||
-					(motor->direction == 1 && motor->position == 4)) {
+			if (motor->total_hall_count >= NUM_PHASES && (motor->other_motor->total_hall_count >= NUM_PHASES || motor->other_motor->state == STOPPED)) {
+				if ((motor->direction == -1 && motor->position == 3) || (motor->direction == 1 && motor->position == 4)) {
 					motor_fets_on(motor);
 					motor->state = SETTING_UP;
 					motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
@@ -284,21 +282,25 @@ void Speed_ISR_Callback(struct Motor *motor) {
 		case(STARTING):
 			if (motor->delta == 0) {
 				motor->new_pwm = motor->pwm + 5;
-			} else if (motor->delta > 6) {
+			} else if (motor->delta > NUM_PHASES) {
 				motor->new_pwm = motor->pwm - 1;
 			}
-			break;
+		break;
 
 		case(SETTING_UP):
 		case(READY_TO_TRANSITION):
-			motor->new_pwm = motor->pwm;
-			break;
+		break;
 
 		case(TRANSITIONING):
-			if (motor->delta < NUM_PHASES) {
+			// go for a bit before ramping up the rpm
+			motor->period_count += 1;
+			if (motor->pwm - 5 >= MIN_MOVE_PERCENT) {
+				motor->new_pwm = motor->pwm - 5;
+			} else {
+				motor->new_pwm = MIN_MOVE_PERCENT;
+			}
+			if (motor->period_count >= NUM_PHASES && (motor->other_motor->period_count >= NUM_PHASES || motor->other_motor->state == STOPPED)) {
 				motor->state = GOING;
-			} else if (motor->delta >= NUM_PHASES) {
-				motor->new_pwm = motor->pwm - 1;
 			}
 		break;
 
@@ -307,11 +309,29 @@ void Speed_ISR_Callback(struct Motor *motor) {
 				motor->new_pwm = motor->pwm + 1;
 			} else if (motor->delta > NUM_PHASES) {
 				motor->new_pwm = motor->pwm - 1;
+			} else {
+				if (motor->speed > motor->target_speed) {
+					if (motor->speed - SPEED_INTERVAL <= motor->target_speed) {
+						motor->speed = motor->target_speed;
+						motor->new_pwm = motor->pwm + 3;
+					} else {
+						motor->speed = motor->speed - SPEED_INTERVAL;
+						motor->new_pwm = motor->pwm + 3;
+					}
+				} else if (motor->speed < motor->target_speed) {
+					if (motor->speed + SPEED_INTERVAL >= motor->target_speed) {
+						motor->speed = motor->target_speed;
+						motor->new_pwm = motor->pwm - 3;
+					} else {
+						motor->speed = motor->speed + SPEED_INTERVAL;
+						motor->new_pwm = motor->pwm - 3;
+					}
+				}
 			}
 		break;
 
 		case(STOPPED):
-			return;
+				return;
 	}
 
 	// double check the position if no change in a while
@@ -351,7 +371,6 @@ static void motor_init(struct Motor *motor) {
 	motor->timer_duty_cnt = 0;
 }
 
-
 /* Start the motor by enabling the interrupts and
  * setting the duty cycles to 0.
  */
@@ -369,8 +388,8 @@ static void motor_start(struct Motor *motor) {
 
 	motor->state = STARTING;
 	motor_set_pwm(motor, 0, 0, 0);
-	motor->pwm = 20;
-	motor->new_pwm = 20;
+	motor->pwm = MIN_MOVE_PERCENT;
+	motor->new_pwm = MIN_MOVE_PERCENT;
 	motor->timer_duty_cnt = 0;
 
 	//enable timers
@@ -380,7 +399,6 @@ static void motor_start(struct Motor *motor) {
 	HAL_NVIC_EnableIRQ(motor->setup.TIM_SPEED_IRQn);
 	HAL_NVIC_EnableIRQ(motor->setup.TIM_DUTY_IRQn);
 }
-
 
 /* Set the speed for a motor by setting the timer to the right value.
  * If the speed is out of range, one of the error bits is set.
@@ -413,13 +431,18 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 
 	if (tick_speed < 0) {
 		motor->direction = -1 * motor->setup.OFFSET_DIR;
-		motor->speed = -1 * (int16_t) tick_speed; //absolute value of <speed>
+		motor->target_speed = -1 * (int16_t) tick_speed; //absolute value of <speed>
 	} else {
 		motor->direction = motor->setup.OFFSET_DIR;
-		motor->speed = (int16_t) tick_speed;
+		motor->target_speed = (int16_t) tick_speed;
 	}
 
 	if (motor->state == STOPPED) {
+		if (absrpm > MAX_STARTUP_RPM) {
+			motor->speed = 1000000 * 60 / (WHEEL_HALL_COUNTS * MAX_STARTUP_RPM);
+		} else {
+			motor->speed = motor->target_speed;
+		}
 		motor_start(motor);
 	}
 
@@ -435,7 +458,7 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir) {
 	int delay = 200;
 
 	// oh god something is broken why is the power ramping up so high, emergency exit
-	if (motor->pwm > MAX_POWER_PERCENT ) {
+	if (motor->pwm > MAX_POWER_PERCENT) {
 		motor->pwm = 0;
 		motor_set_pwm(motor, 0, 0, 0);
 		SET_ERROR_BIT(status, STATUS_MAX_POWER_REACHED);
@@ -450,7 +473,7 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir) {
 		for (j = 0; j < NUM_PHASES; j++) {
 			HAL_IWDG_Refresh(&hiwdg);   //819mS
 
-			motor_fets_trapezoidal(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*j)][0], REVERSE_HALL_LOOKUP[in_range(calibration_dir*j)][2]);
+			motor_fets_trapezoidal(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * j)][0], REVERSE_HALL_LOOKUP[in_range(calibration_dir * j)][2]);
 
 			delay_ms(delay);
 			calibrate_positions[j] = motor_get_position(motor);
@@ -516,7 +539,7 @@ static void motor_pwm(struct Motor *motor, float value_percent) {
 		if (motor->state == STARTING) {
 			for (i = 0; i < DUTY_STEPS; i++) {
 				motor->DUTY_LOOKUP_1[i] = (uint16_t)(motor->pwm * motor->pwm_percent_period);
-				motor->DUTY_LOOKUP_2[i] = (uint16_t)(motor->pwm * BASE_DUTY_LOOKUP[i] );
+				motor->DUTY_LOOKUP_2[i] = (uint16_t)(motor->pwm * BASE_DUTY_LOOKUP[i]);
 			}
 		} else {
 			if (motor->DUTY_LOOKUP_POINTER_NEW == motor->DUTY_LOOKUP_1) {
@@ -559,7 +582,7 @@ static void motor_HallSensor_init(struct Motor *motor) {
 		__HAL_RCC_GPIOC_CLK_ENABLE();
 
 	/*Configure GPIO pins : HALL_LEFT_A_PIN HALL_LEFT_B_PIN HALL_LEFT_C_PIN */
-	GPIO_InitStruct.Pin = motor->setup.HALL_PINS[0]|motor->setup.HALL_PINS[1]|motor->setup.HALL_PINS[2];
+	GPIO_InitStruct.Pin = motor->setup.HALL_PINS[0] | motor->setup.HALL_PINS[1] | motor->setup.HALL_PINS[2];
 	GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
 	GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -695,9 +718,9 @@ static void motor_TIM_Speed_init(struct Motor *motor) {
 /* Set the PWM duty cycle for whatever channel.
  */
 static void motor_set_pwm(struct Motor *motor, float value0, float value1, float value2) {
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[0], value0);
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[1], value1);
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[2], value2);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm), TIM_CHANNELS[0], value0);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm), TIM_CHANNELS[1], value1);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm), TIM_CHANNELS[2], value2);
 }
 
 /* Turn on all the mosfets of the half bridges
@@ -775,6 +798,7 @@ static uint16_t in_range_duty(struct Motor *motor, int channel, int index) {
 						motor->state = READY_TO_TRANSITION;
 					} else if (motor->state == READY_TO_TRANSITION) {
 						motor->DUTY_LOOKUP_POINTER_NEW = motor->DUTY_LOOKUP_1;
+						 motor->period_count = 0;
 						motor->state = TRANSITIONING;
 					}
 				}

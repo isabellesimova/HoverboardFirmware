@@ -5,7 +5,6 @@
 #define __CONFIG__H
 
 // ----------------------MODES----------------------
-
 /* Use CALIBRATION mode BEFORE running the firmware not in CALIBRATION mode
  * to figure out what the wheel offsets are. Since every wheel is different,
  * calibration is necessary to move the wheel smoothly. The process involves
@@ -45,20 +44,19 @@
  */
 #define L_POS_OFFSET 		5
 #define L_NEG_OFFSET 		2
-#define L_WHEEL_DIR 		1
+#define L_WHEEL_DIR 		-1
 #define R_POS_OFFSET 		5
 #define R_NEG_OFFSET		2
-#define R_WHEEL_DIR 	   -1
-
-
-
-
+#define R_WHEEL_DIR 	    1
 
 /* SAFETY LIMIT
  * The wheel at max power goes REALLY fast. Most speeds can be achieved with <25%
  * the full power. Set a maximum of the power any wheel should reach.
  */
-#define MAX_POWER_PERCENT 20
+#define MIN_MOVE_PERCENT 10
+#define MAX_POWER_PERCENT 100
+#define MAX_STARTUP_RPM 40
+#define SPEED_INTERVAL 2000
 
 /* CHECKING FREQUENCIES
  * The frequencies for various tasks - power hcecks, UART communication, heart beat check.
