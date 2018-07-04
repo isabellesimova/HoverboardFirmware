@@ -198,7 +198,7 @@ void Motors_calibrate() {
 
 /* Calibrate a wheel by slowly increasing the pwm duty cycle until it moves just enough.
  */
-void motor_calibrate(struct Motor *motor, int8_t callibration_dir, uint8_t power) {
+void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t power) {
 
 	HAL_IWDG_Refresh(&hiwdg);   //819mS
 
@@ -216,7 +216,7 @@ void motor_calibrate(struct Motor *motor, int8_t callibration_dir, uint8_t power
 	// oh god something is broken why is the power ramping up so high, emergency exit
 	if (power > 100 ) {
 		motor_Set_PWM_ALL(motor, 0);
-		while (!Uart_is_TX_free);
+		while (!Uart_is_TX_free());
 		sprintf((char *)&uart.TX_buffer[0],"max limited power reached, probably something is wrong\n");
 		Uart_TX((char *)&uart.TX_buffer[0]);
 		return;
@@ -231,11 +231,11 @@ void motor_calibrate(struct Motor *motor, int8_t callibration_dir, uint8_t power
 		for (j = 0; j < NUM_PHASES; j++) {
 			HAL_IWDG_Refresh(&hiwdg);   //819mS
 
-			motor_High_OFF(motor, REVERSE_HALL_LOOKUP[in_range(callibration_dir*(j-1))][0]);
-			motor_Low_OFF(motor, REVERSE_HALL_LOOKUP[in_range(callibration_dir*(j-1))][2]);
+			motor_High_OFF(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*(j-1))][0]);
+			motor_Low_OFF(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*(j-1))][2]);
 
-			motor_High_ON(motor, REVERSE_HALL_LOOKUP[in_range(callibration_dir*j)][0]);
-			motor_Low_ON(motor, REVERSE_HALL_LOOKUP[in_range(callibration_dir*j)][2]);
+			motor_High_ON(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*j)][0]);
+			motor_Low_ON(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*j)][2]);
 
 			delay_ms(delay);
 			calibrate_positions[j] = motor_Get_Position(motor);
@@ -245,7 +245,7 @@ void motor_calibrate(struct Motor *motor, int8_t callibration_dir, uint8_t power
 
 		// didn't really move, ramp up power
 		if (offset_dir == 0) {
-			Motor_calibrate(motor, callibration_dir, power + 10);
+			motor_calibrate(motor, calibration_dir, power + 10);
 			return;
 		}
 	}
@@ -266,14 +266,14 @@ void motor_calibrate(struct Motor *motor, int8_t callibration_dir, uint8_t power
 
 	// offset direction should be 1 or -1
 	if (offset_dir != 1 && offset_dir != -1) {
-		Motor_calibrate(motor, callibration_dir, power + 1);
+		motor_calibrate(motor, calibration_dir, power + 1);
 		return;
 	}
 
 	// make sure all the offsets are right
 	for (i = 0; i < NUM_PHASES - 1; i ++) {
 		if (in_range(calibrate_positions[i+1] - calibrate_positions[i]) != in_range(offset_dir) ) {
-			Motor_calibrate(motor, callibration_dir, power + 1);
+			motor_calibrate(motor, calibration_dir, power + 1);
 			return;
 		}
 	}

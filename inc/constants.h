@@ -2,7 +2,7 @@
  */
 
 #ifndef __CONSTANTS__H
-#define __CONSTANTS_H
+#define __CONSTANTS__H
 
 /* ERROR BITS
  * Defines what each bit in the status byte represents

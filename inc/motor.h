@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include "stm32f1xx_hal.h"
+#include "config.h"
 
 #define PWM_MOTOR 25000			//PWM frequency in Hertz
 #define MIN_SPEED 11			//rotations per minute
@@ -78,7 +79,7 @@ void Motors_speeds(int16_t l_rpm, int16_t r_rpm);
 void Motors_stop();
 #ifdef CALIBRATION
 void Motors_calibrate();
-void motor_calibrate(struct Motor *motor, int8_t callibration_dir, uint8_t power);
+void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t power);
 #endif
 
 // PRIVATE
