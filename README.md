@@ -5,7 +5,7 @@ This repository contains firmware to reflash the motor controller that comes wit
 ## Getting Started
 ### Materials needed
 * hoverboard motor controller board
-* screwdriver 
+* screwdriver
 * solder / soldering iron / solder pump
 * 4 male header pins
 * 4-5 female to female jumper wires (5th one optional for reset pin)
@@ -14,21 +14,21 @@ This repository contains firmware to reflash the motor controller that comes wit
 
 
 ### Setting up the board
-In the setup, we'll be referencing positions of certain things on the board. To make sure we're all on the same page, let's orient the board such that the longest side is at the top. 
+In the setup, we'll be referencing positions of certain things on the board. To make sure we're all on the same page, let's orient the board such that the longest side is at the top.
 
 Before we can wire anything up, we'll need to prepare the board by soldering debug pins onto it, marked in red below:
 
 ![pin locations](ref/pin_locations.jpg)
 
-1. Unscrew all 12 screws on the perimeter of the board to remove the metal plate backing. 
-2. Remove the solder from the debug pin holes (using the iron and the solder pump). 
+1. Unscrew all 12 screws on the perimeter of the board to remove the metal plate backing.
+2. Remove the solder from the debug pin holes (using the iron and the solder pump).
 3. Place the 4 male header pins into the debug pin holes.
-4. Solder the pins into place 
+4. Solder the pins into place
 5. Screw the 12 screws back to put the metal plate back.
 
 Time for the reset pin! Note that this is entirely optional. By doing the next few steps, it makes programming the device a lot more reliable. Otherwise, it may take a few tries to program the device successfully.
 
-6. (Optional) Cut a female to female jumper wire so that wire is as long as possible. 
+6. (Optional) Cut a female to female jumper wire so that wire is as long as possible.
 7. (Optional) Taking the long piece, strip a tiny bit off the snipped part, and solder it into the far end of the resisitor attached to pin 7 (just to the right of the ST, marked in red above). It may be marked R15 or R19 depending on your hoverboard model.
 
 ### Wiring
@@ -40,7 +40,7 @@ SWCLK
 3.3V
 ```
 
-Depending on what ST Link V2 you have, you'll hook it up differently. 
+Depending on what ST Link V2 you have, you'll hook it up differently.
 If you have the [10 pin version](https://www.mouser.com/ProductDetail/Adafruit/2548/?qs=SElPoaY2y5K%252bwHNUAvyTvg%3D%3D) that plugs directly into the computer USB port, just match each of the debug pins to however your ST Link V2 is labeled:
 
 |  Motor Board |  ST Link V2  |
@@ -64,7 +64,7 @@ If you have the [20 pin version](https://www.mouser.com/ProductDetail/STMicroele
 | 3.3V  | 3.3V  (Pin 2) <br> (And connect Pin 1 to Pin 19*)|
 | reset pin (optional)  |  RST (Pin 15)|
 
-*We need to 1) power the ST and 2) let the ST Link know that the device is powered (TVCC). To do this, we use Pin 19's 3.3V to power both TVCC (Pin 1 & Pin 2) and the 3.3V pin on the motor board. Since Pins 1 and 2 are internally connected, connecting Pin 19 to either of them powers the other one, and we can connect the other one to the 3.3V pin on the motor board. 
+*We need to 1) power the ST and 2) let the ST Link know that the device is powered (TVCC). To do this, we use Pin 19's 3.3V to power both TVCC (Pin 1 & Pin 2) and the 3.3V pin on the motor board. Since Pins 1 and 2 are internally connected, connecting Pin 19 to either of them powers the other one, and we can connect the other one to the 3.3V pin on the motor board.
 
 ### ST Link Setup
 
@@ -87,7 +87,7 @@ openocd: "\x56\x3f\x72\x06\x51\x3f\x52\x50\x48\x32\x15\x3f"
 
 If you have a device show up, we're ready to move on to the [next section](README.md#unlocking-the-device)! Otherwise, feel free to check out some common problems:
 
-##### Troubleshooting 
+##### Troubleshooting
 - If you see:
 ```
 Found 1 stlink programmers
@@ -108,13 +108,23 @@ $ openocd -f interface/stlink-v2.cfg -f target/stm32f1x.cfg -c init -c "reset ha
 
 In response, you should see a bunch of INFO messages, as well as:
 ```
-stm32x unlocked. 
+stm32x unlocked.
 ```
 at some point in the messages. If you see the unlocked message, we're ready to move on. If you can't unlock it, you might need to find a device with windows OS, and use the ST Link tools to unlock it.
 
 
 ## Flashing the firmware
 Now that everything is set up, it's time to actually flash some new firmware onto the device!
+
+#### Dependencies
+In order to compile the firmware you'll need to install the [GNU Embedded Toolchain for Arm](https://developer.arm.com/open-source/gnu-toolchain/gnu-rm/downloads). You can download and install the toolchain appropriate for your development machine or use your favorite package manager. Below are instructions for using homebrew on MacOS.
+
+##### MacOS
+```
+$ brew tap PX4/homebrew-px4
+$ brew update
+$ brew install gcc-arm-none-eabi
+```
 
 #### Calibration
 ###### Configuration and Flashing
@@ -125,7 +135,7 @@ Before we can flash the code that moves the motors, there are some values we nee
 
 Now that that's set up, we can flash the calibration firmware by:
 1. cd-ing to your repo (the directory containg the inc/ and src/ directories and the Makefile).
-2. Compile the files by typing 
+2. Compile the files by typing
 ```
 $ make
 ```
@@ -158,7 +168,7 @@ If your device is a raspberry pi, make sure to enable serial in raspi-config and
 ```
 pi@raspberrypi:~ $minicom -b 9600 -D /dev/ttyS0
 ```
-(Note that to exit out of minicom, you type Ctrl+A, then Q.) 
+(Note that to exit out of minicom, you type Ctrl+A, then Q.)
 
 Now that we have the UART set up, we can see what the configuration settings for the wheels should be. Turn on the motor board and wait for the wheels to slowly start moving - it can take a bit for the wheels to start moving. You should see messages of the format (which will repeat until turned off):
 
@@ -210,7 +220,7 @@ $ st-flash write build/hoverboard.bin 0x8000000
 Now that the firmware is set up, it's time to command the wheels to move! The ST is expecting commands over UART at a baud rate of 9600. Since the UART communication implements a variation of SLIP, commands should be **prefixed** and **postfixed** with any of the newline characters: \r or \n or \r\n.
 
 
-The command format is 
+The command format is
 ```
 L[rpm],R[rpm]
 ```
@@ -231,7 +241,7 @@ Some examples of appropriate commands are:
 As a safety precaution, a heartbeat has been included (configurable in the [config file](inc/config.h)). This means that the wheels will stop moving if it has not received any new commands in however many milliseconds specified in the config file.
 
 ## Errors!
-If the status byte you are receiving back is not 0... that usually means something is wrong. 
+If the status byte you are receiving back is not 0... that usually means something is wrong.
 ```
 BAD_PARSING           0 (the latest SLIP frame format is wrong)
 SPEED_OUT_OF_BOUNDS   1 (the rpm wasn't between ±12 and ±360)
@@ -241,7 +251,7 @@ LOW_BATTERY           4 (the battery voltage is less than 32V)
 IS_CHARGING           5 (the battery is charging)
 ```
 
-Note that the motor board will also start beeping when the voltage is too low. 
+Note that the motor board will also start beeping when the voltage is too low.
 
 ## Acknowledgments
 Inspiration for the orginal version of this code can be attributed to [NiklasFauth/Hoverboard-Board-Hack](https://github.com/NiklasFauth/Hoverboard-Board-Hack).
