@@ -70,6 +70,20 @@ If you have the [20 pin version](https://www.mouser.com/ProductDetail/STMicroele
 
 Now that everything is wired up, let's make sure we can communicate between our computer and the ST chip on the microcontroller. If you don't already have the ST-link tools, you can install it by following the instructions for your operating system  on the README of the [Stlink Tools Repo](https://github.com/texane/stlink#installation).
 
+###### Linux:
+Following [the installation guide](https://github.com/texane/stlink/blob/master/doc/compiling.md):
+```
+$ sudo apt-get install cmake
+$ sudo apt-get install libusb-1.0.0
+$ git clone https://github.com/texane/stlink.git
+$ cd stlink
+$ make release
+$ cd build/Release; sudo make install
+$ sudo ldconfig
+```
+
+##### Using ST link
+
 Now that you have the tools ready, let's probe our ST link to see what it's detecting:
 ```
 $ st-info --probe
@@ -124,6 +138,14 @@ In order to compile the firmware you'll need to install the [GNU Embedded Toolch
 $ brew tap PX4/homebrew-px4
 $ brew update
 $ brew install gcc-arm-none-eabi
+```
+
+##### Linux
+```
+$ sudo add-apt-repository ppa:team-gcc-arm-embedded/ppa
+$ sudo apt-get update
+$ sudo apt-get install gcc-arm-embedded
+$ sudo ln -s /usr/bin/arm-none-eabi-* /usr/local/bin/
 ```
 
 #### Calibration
