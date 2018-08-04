@@ -39,6 +39,7 @@ int16_t speeds[2];
  */
 int main(void)
 {
+
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 	HAL_Init();
 	/* Configure the system clock */
@@ -49,6 +50,9 @@ int main(void)
 	// power everything
 	button_init();
 	buzzer_init();
+	#ifdef BUZZER_START_DEBUG
+	buzzer_one_beep();
+	#endif
 	charging_init();
 	led_init();
 	led_set(1);
@@ -56,6 +60,7 @@ int main(void)
 	MX_USART2_UART_Init();
 	ADCs_setup_and_init();
 	Motors_setup_and_init();
+
 
 #ifdef CALIBRATION
 
@@ -117,7 +122,7 @@ void transmit_data() {
 	float data_v;
 	data_v = GET_BATTERY_VOLT();
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(DEBUG_NO_ADC)
 	//TODO: These readings are not in amps, needs work.
 	float data_i_L, data_i_R;
 	data_i_L = GET_MOTOR_AMP(&adc_L);

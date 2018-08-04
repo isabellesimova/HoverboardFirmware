@@ -14,11 +14,19 @@
  * You'll need to have UART (9600 baud rate) set up to see what the st microcontroller
  * is outputting.
  */
-#define CALIBRATION //comment out when not in use
+//#define CALIBRATION //comment out when not in use
 
 /* Use DEBUG mode to send extra data via UART (such as the motor currents)
  */
 #define DEBUG //comment out when not in use
+/* Disable ADC debuging when in DEBUG mode, temporary fix for issue #2
+   https://github.com/isabellesimova/HoverboardFirmware/issues/2
+*/
+#define DEBUG_NO_ADC //comment out when not in use
+
+/* One beep at start
+ */
+//#define BUZZER_START_DEBUG //comment out when not in use
 
 /* Pick a mode for control - trapezoidal or sinusoidal. Trapezoidal is simpler
  * and works with less logic. Sinusoidal is more complex but works better at low speeds.
