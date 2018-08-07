@@ -39,7 +39,6 @@ int16_t speeds[2];
  */
 int main(void)
 {
-
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 	HAL_Init();
 	/* Configure the system clock */
@@ -60,7 +59,6 @@ int main(void)
 	MX_USART2_UART_Init();
 	ADCs_setup_and_init();
 	Motors_setup_and_init();
-
 
 #ifdef CALIBRATION
 
