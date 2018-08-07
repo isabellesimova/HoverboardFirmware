@@ -78,6 +78,19 @@ AR = $(BINPATH)/$(PREFIX)ar
 SZ = $(BINPATH)/$(PREFIX)size
 HEX = $(CP) -O ihex
 BIN = $(CP) -O binary -S
+
+#######################################
+# for windows, use:
+#######################################
+# BINPATH = "C:\Program Files (x86)\GNU Tools Arm Embedded\7 2018-q2-update\bin
+# PREFIX = arm-none-eabi-
+# CC = $(BINPATH)/$(PREFIX)gcc"
+# AS = $(BINPATH)/$(PREFIX)gcc" -x assembler-with-cpp
+# CP = $(BINPATH)/$(PREFIX)objcopy"
+# AR = $(BINPATH)/$(PREFIX)ar"
+# SZ = $(BINPATH)/$(PREFIX)size"
+# HEX = $(CP) -O ihex
+# BIN = $(CP) -O binary -S
  
 #######################################
 # CFLAGS
@@ -179,7 +192,19 @@ $(BUILD_DIR):
 #######################################
 clean:
 	-rm -fR .dep $(BUILD_DIR)
-  
+
+#######################################
+# upload
+#######################################
+upload:
+	st-flash write build/hoverboard.bin 0x8000000
+
+#######################################
+# unlock
+#######################################
+unlock:
+	openocd -f interface/stlink-v2.cfg -f target/stm32f1x.cfg -c init -c "reset halt" -c "stm32f1x unlock 0" -c "reset halt" -c "exit"
+
 #######################################
 # dependencies
 #######################################

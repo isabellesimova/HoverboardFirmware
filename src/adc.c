@@ -96,9 +96,13 @@ void adc_calibrate(struct ADC *adc) {
  */
 float GET_BATTERY_VOLT(void) {
 	//fixed point, everything * 16
-	battery_voltage -= battery_voltage / ROLLING_SAMPLES;
-	battery_voltage += ADC_BATTERY();
-	return (float) (battery_voltage / ROLLING_SAMPLES) * ADC_BATTERY_VOLT;
+	#ifndef DEBUG_NO_ADC
+		battery_voltage -= battery_voltage / ROLLING_SAMPLES;
+		battery_voltage += ADC_BATTERY();
+		return (float) (battery_voltage / ROLLING_SAMPLES) * ADC_BATTERY_VOLT;
+	#else
+		return 36.0;  //Fake Voltage
+	#endif
 }
 
 /* Return a rolling average of the motor current (last 16 samples).

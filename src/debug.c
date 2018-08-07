@@ -55,6 +55,21 @@ void buzzer_two_beeps(void){
 	buzzer_set(0);
 }
 
+void buzzer_three_beeps(void){
+	for(int j=0;j<3;j++){
+		for(int i=0;i<150;i++){
+			buzzer_set(1);
+			delay_us(160);
+			buzzer_set(0);
+			delay_us(160);
+			HAL_IWDG_Refresh(&hiwdg);   //819mS
+		}
+		buzzer_set(0);
+		HAL_Delay(200);
+	}
+	buzzer_set(0);
+}
+
 void buzzer_short_beep(void){
 	for(int i=0;i<80;i++){
 		buzzer_set(1);

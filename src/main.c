@@ -49,6 +49,9 @@ int main(void)
 	// power everything
 	button_init();
 	buzzer_init();
+	#ifdef BUZZER_START_DEBUG
+	buzzer_one_beep();
+	#endif
 	charging_init();
 	led_init();
 	led_set(1);
@@ -117,7 +120,7 @@ void transmit_data() {
 	float data_v;
 	data_v = GET_BATTERY_VOLT();
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(DEBUG_NO_ADC)
 	//TODO: These readings are not in amps, needs work.
 	float data_i_L, data_i_R;
 	data_i_L = GET_MOTOR_AMP(&adc_L);

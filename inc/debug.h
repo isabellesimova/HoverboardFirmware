@@ -21,6 +21,7 @@ void buzzer_init(void);
 void buzzer_set(uint8_t stato);
 void buzzer_one_beep(void);
 void buzzer_two_beeps(void);
+void buzzer_three_beeps(void);
 void buzzer_short_beep(void);
 void buzzer_long_beep(void);
 
