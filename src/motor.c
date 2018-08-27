@@ -167,8 +167,8 @@ void Motors_setup_and_init() {
 
 		//ascending
 		BASE_DUTY_LOOKUP[5][i] = 0;
-	}
 #endif
+	}
 }
 
 /* Set the speed for both motors.
