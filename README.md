@@ -9,7 +9,7 @@ This repository contains firmware to reflash the motor controller that comes wit
 4. [Run Hoverbot](doc/4_RunningHoverbot.md) - flash the microcontroller with the code that makes the bot move!
 
 Other setup guides:
-- [Debug with SystemWorkbench](doc/SystemWorkbenchSetup.md)
+- [Debug with SystemWorkbench](dev_env/SystemWorkbench/README.md)
 
 
 
