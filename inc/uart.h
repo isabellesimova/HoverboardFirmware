@@ -14,11 +14,11 @@ extern "C" {
 #define BUFFER_LENGTH 128
 
 struct UART {
-	volatile __IO uint8_t RX_buffer[BUFFER_LENGTH];
-	volatile __IO uint8_t TX_buffer[BUFFER_LENGTH];
-	volatile __IO uint8_t RX_pointer;
-	volatile __IO uint8_t RX_available;
-	volatile __IO uint8_t TX_free;
+	volatile uint8_t RX_buffer[BUFFER_LENGTH];
+	volatile uint8_t TX_buffer[BUFFER_LENGTH];
+	volatile uint8_t RX_pointer;
+	volatile uint8_t RX_available;
+	volatile uint8_t TX_free;
 };
 
 void MX_USART2_UART_Init(void);

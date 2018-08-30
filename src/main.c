@@ -1,5 +1,4 @@
 #include "stm32f1xx_hal.h"
-#include "main.h"
 #include "constants.h"
 #include "config.h"
 #include "power.h"
@@ -8,28 +7,28 @@
 #include "adc.h"
 #include "motor.h"
 
-extern volatile __IO struct UART uart;
+extern volatile struct UART uart;
 
-/* Private variables ---------------------------------------------------------*/
-
-/* Private function prototypes -----------------------------------------------*/
+// ----------------------PRIVATE----------------------
 static void SystemClock_Config(void);
-void error_handler(void);
 static void MX_IWDG_Init(void);
 static void receive_data();
 static void transmit_data();
 static void check_power();
 
+// ----------------------PUBLIC----------------------
+void error_handler(void);
 
+uint32_t time, last_tx_time, last_rx_time, last_pwr_time;
+volatile int8_t status;
+int16_t speeds[2];
 IWDG_HandleTypeDef hiwdg;
+
 #ifdef DEBUG
 extern struct ADC adc_L;
 extern struct ADC adc_R;
 #endif
 
-volatile uint32_t time, last_tx_time, last_rx_time, last_pwr_time;
-volatile int8_t status;
-int16_t speeds[2];
 
 /* MAIN
  * Setup the clock and watchdog, and initialize all the peripherals.
@@ -97,7 +96,7 @@ int main(void)
 }
 
 
-// ----------- PRIVATE METHODS ----------------
+// ----------------------PRIVATE----------------------
 /* RECEIVE DATA
  * Process the newly received data. If a proper frame was processed, update the last_rx_time.
  * Update the motors to the new speeds.

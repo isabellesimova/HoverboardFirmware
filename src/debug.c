@@ -10,7 +10,7 @@
 extern IWDG_HandleTypeDef hiwdg;
 
 /************* BUZZER *************/
-void buzzer_init(void){
+void buzzer_init(void) {
 	GPIO_InitTypeDef GPIO_InitStruct;
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	/*Configure GPIO pin Output Level */
@@ -25,12 +25,12 @@ void buzzer_init(void){
 	buzzer_set(0);
 }
 
-void buzzer_set(uint8_t state){
-	HAL_GPIO_WritePin(BUZZER_GPIO_PORT, BUZZER_PIN, (GPIO_PinState)state);
+void buzzer_set(uint8_t state) {
+	HAL_GPIO_WritePin(BUZZER_GPIO_PORT, BUZZER_PIN, (GPIO_PinState) state);
 }
 
-void buzzer_one_beep(void){
-	for(int i=0;i<200;i++){
+void buzzer_one_beep(void) {
+	for (int i = 0; i < 200; i++) {
 		buzzer_set(1);
 		delay_us(160);
 		buzzer_set(0);
@@ -40,9 +40,9 @@ void buzzer_one_beep(void){
 	buzzer_set(0);
 }
 
-void buzzer_two_beeps(void){
-	for(int j=0;j<2;j++){
-		for(int i=0;i<150;i++){
+void buzzer_two_beeps(void) {
+	for (int j = 0; j < 2; j++) {
+		for (int i = 0; i < 150; i++) {
 			buzzer_set(1);
 			delay_us(160);
 			buzzer_set(0);
@@ -55,9 +55,9 @@ void buzzer_two_beeps(void){
 	buzzer_set(0);
 }
 
-void buzzer_three_beeps(void){
-	for(int j=0;j<3;j++){
-		for(int i=0;i<150;i++){
+void buzzer_three_beeps(void) {
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < 150; i++) {
 			buzzer_set(1);
 			delay_us(160);
 			buzzer_set(0);
@@ -70,8 +70,8 @@ void buzzer_three_beeps(void){
 	buzzer_set(0);
 }
 
-void buzzer_short_beep(void){
-	for(int i=0;i<80;i++){
+void buzzer_short_beep(void) {
+	for (int i = 0; i < 80; i++) {
 		buzzer_set(1);
 		delay_us(160);
 		buzzer_set(0);
@@ -81,8 +81,8 @@ void buzzer_short_beep(void){
 	buzzer_set(0);
 }
 
-void buzzer_long_beep(void){
-	for(int i=0;i<600;i++){
+void buzzer_long_beep(void) {
+	for (int i = 0; i < 600; i++) {
 		buzzer_set(1);
 		delay_us(160);
 		buzzer_set(0);
@@ -91,10 +91,9 @@ void buzzer_long_beep(void){
 	}
 	buzzer_set(0);
 }
-
 
 /************* LED *************/
-void led_init(void){
+void led_init(void) {
 	GPIO_InitTypeDef GPIO_InitStruct;
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 	/*Configure GPIO pin Output Level */
@@ -106,12 +105,12 @@ void led_init(void){
 	HAL_GPIO_Init(LED_GPIO_PORT, &GPIO_InitStruct);
 }
 
-void led_set(uint8_t state){
-	HAL_GPIO_WritePin(LED_GPIO_PORT, LED_PIN, (GPIO_PinState)state);
+void led_set(uint8_t state) {
+	HAL_GPIO_WritePin(LED_GPIO_PORT, LED_PIN, (GPIO_PinState) state);
 }
 
 /************* DEBUG PINS *************/
-void debug_pin_init(void){
+void debug_pin_init(void) {
 	GPIO_InitTypeDef GPIO_InitStruct;
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 	/*Configure GPIO pin Output Level */
@@ -129,21 +128,21 @@ void debug_pin_init(void){
 /* Debug pin 10 is the blue pin on the side with shorter wires.
  * (opposite the UART connections, opposite the speaker).
  */
-void debug_pin_10_ON(void){
+void debug_pin_10_ON(void) {
 	GPIOB->BSRR = GPIO_PIN_10;
 }
 
-void debug_pin_10_OFF(void){
+void debug_pin_10_OFF(void) {
 	GPIOB->BSRR = 0x04000000;
 }
 
 /* Debug pin 11 is the green pin on the side with shorter wires.
  * (opposite the UART connections, opposite the speaker).
  */
-void debug_pin_11_ON(void){
+void debug_pin_11_ON(void) {
 	GPIOB->BSRR = GPIO_PIN_11;
 }
 
-void debug_pin_11_OFF(void){
+void debug_pin_11_OFF(void) {
 	GPIOB->BSRR = 0x08000000;
 }

@@ -1,3 +1,9 @@
+/**
+ * This class allows for control of a 3 phase BLDC motor.
+ * It uses trapezoidal commutation to start up the motor, and once it has moved a bit, it will switch to sinusoidal control.
+ * The sinusoidal control runs between 0 and motor->pwm % duty cycle, and each phase switches to a new pwm% duty cycle when the duty cycle hits 0%.
+ */
+
 #ifndef __MOTOR__H
 #define __MOTOR__H
 
@@ -15,8 +21,8 @@ extern "C" {
 #define DUTY_STEPS 16
 #define PI 3.14159265358
 
-struct Motor_setup{
-
+//non volatile stuff, constant things
+struct Motor_setup {
 	// just L or R to help with debugging
 	char side;
 
@@ -51,29 +57,29 @@ struct Motor_setup{
 	uint16_t GPIO_HIGH_CH_PINS;
 };
 
+// volatile variables that change on interrupts
 struct Motor {
 	struct Motor_setup setup;
-	volatile __IO uint32_t uwPeriodValue;
-	volatile __IO uint8_t position; //hall
-	volatile __IO uint8_t next_position; //hall
+	volatile uint32_t uwPeriodValue;
+	volatile uint8_t position; //hall
+	volatile uint8_t next_position; //hall
 
-	volatile __IO float pwm;
+	volatile float pwm;
 
-	volatile __IO uint16_t speed;
-	volatile __IO int8_t direction; //+1 or -1
-	volatile __IO uint8_t stop; // 0 or 1
+	volatile uint16_t speed;
+	volatile int8_t direction; //+1 or -1
+	volatile uint8_t stop; // 0 or 1
 
-	volatile __IO float pos_increment; // 1 or 0.1
-	volatile __IO float neg_increment; // 2 or 0.1
+	volatile float pos_increment; // 1 or 0.1
+	volatile float neg_increment; // 2 or 0.1
 
 	// pwm lines: +1, 0, or -1
-	volatile __IO uint32_t PWM_DUTIES[3];
-	volatile __IO uint32_t DUTY_LOOKUP[6][DUTY_STEPS];
+	volatile uint32_t PWM_DUTIES[3];
+	volatile uint32_t DUTY_LOOKUP[6][DUTY_STEPS];
 
-	volatile __IO int16_t timer_duty_cnt;
+	volatile int16_t timer_duty_cnt;
 };
 
-// PUBLIC
 void motors_setup_and_init(void);
 void motors_stop();
 void motors_calibrate();

@@ -12,6 +12,7 @@ struct ADC adc_R;
 
 static int battery_voltage;
 
+// ----------------------PRIVATE----------------------
 static void adc_init(struct ADC *adc);
 static void adc_calibrate(struct ADC *adc);
 static uint16_t adc_battery(void);
@@ -35,7 +36,6 @@ void adcs_setup_and_init() {
 	adc_init(&adc_L);
 }
 
-// ------------ROLLING AVG----------------
 /* Return a rolling average of the battery voltage (last 16 samples).
  */
 float get_battery_volt(void) {
@@ -53,7 +53,6 @@ float get_motor_current(struct ADC *adc) {
 	adc->avg_current += adc_motor(adc);
 	return adc->avg_current / ROLLING_SAMPLES;
 }
-
 
 // ----------------------PRIVATE----------------------
 /* Initialize the ADCs to convert continuously and start DMA to transfer

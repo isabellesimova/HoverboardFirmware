@@ -8,14 +8,14 @@
 #include "string.h"
 #include "constants.h"
 
-/* Private function prototypes -----------------------------------------------*/
-int process_frame(uint8_t start, uint8_t length);
+// ----------------------PRIVATE----------------------
+static int process_frame(uint8_t start, uint8_t length);
 
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
-volatile __IO struct UART uart;
+volatile struct UART uart;
 
 extern volatile int8_t status;
 extern uint16_t speeds[2];
@@ -150,13 +150,13 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
 }
 
 
-// Private methods
+// ----------------------PRIVATE----------------------
 /* Process a single SLIP frame. It should be of the format:
  * "L(-)##(#),R(-)##(#)"
  * If the format is not correct, then the bad parsing flag is set.
  * Once a correct frame is parsed, the bad parsing flag will be cleared.
  */
-int process_frame(uint8_t start, uint8_t length) {
+static int process_frame(uint8_t start, uint8_t length) {
 	int8_t i = 0, rx_value = 0;
 	int8_t parse_state = 0;
 	int8_t digits_first = 1, rx_digits = 0;

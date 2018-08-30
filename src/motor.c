@@ -8,8 +8,7 @@
 #include "uart.h"
 
 extern IWDG_HandleTypeDef hiwdg;
-extern volatile __IO struct UART uart;
-
+extern volatile struct UART uart;
 
 struct Motor motor_L;
 struct Motor motor_R;
@@ -22,12 +21,12 @@ static const uint8_t HALL_LOOKUP[6] = {
 };
 
 static const int8_t REVERSE_HALL_LOOKUP[6][4] = {
-		{0,1,2,-1},
-		{0,2,1, 1},
-		{2,0,1,-1},
-		{2,1,0, 1},
-		{1,2,0,-1},
-		{1,0,2, 1}
+		{ 0, 1, 2, -1 },
+		{ 0, 2, 1,  1 },
+		{ 2, 0, 1, -1 },
+		{ 2, 1, 0,  1 },
+		{ 1, 2, 0, -1 },
+		{ 1, 0, 2,  1 }
 };
 
 static const uint32_t TIM_CHANNELS[3] = {
@@ -38,24 +37,24 @@ static const uint32_t TIM_CHANNELS[3] = {
 
 #if CONTROL_METHOD == SINUSOIDAL_CONTROL
 static const float DUTY_SINUSOIDAL[96]= {
-		0.86328125, 0.89453125, 0.921875, 0.9453125, 0.96484375, 0.9765625, 0.98828125, 0.99609375,
-		0.99609375, 0.99609375, 0.98828125, 0.98046875, 0.96484375, 0.9453125, 0.92578125, 0.8984375,
-		0.8671875, 0.890625, 0.91796875, 0.94140625, 0.9609375, 0.9765625, 0.98828125, 0.99609375,
-		0.99609375, 0.99609375, 0.9921875, 0.98046875, 0.96484375, 0.94921875, 0.92578125, 0.8984375,
-		0.87109375, 0.8359375, 0.796875, 0.7578125, 0.71484375, 0.66796875, 0.6171875, 0.5625,
-		0.5078125, 0.453125, 0.39453125, 0.33203125, 0.26953125, 0.20703125, 0.140625, 0.078125,
-		0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-		0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-		0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-		0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-		0.0078125, 0.07421875, 0.13671875, 0.203125, 0.265625, 0.328125, 0.38671875, 0.44921875,
-		0.49609375, 0.5546875, 0.60546875, 0.65625, 0.703125, 0.75, 0.7890625, 0.828125
+	0.86328125, 0.89453125, 0.921875, 0.9453125, 0.96484375, 0.9765625, 0.98828125, 0.99609375,
+	0.99609375, 0.99609375, 0.98828125, 0.98046875, 0.96484375, 0.9453125, 0.92578125, 0.8984375,
+	0.8671875, 0.890625, 0.91796875, 0.94140625, 0.9609375, 0.9765625, 0.98828125, 0.99609375,
+	0.99609375, 0.99609375, 0.9921875, 0.98046875, 0.96484375, 0.94921875, 0.92578125, 0.8984375,
+	0.87109375, 0.8359375, 0.796875, 0.7578125, 0.71484375, 0.66796875, 0.6171875, 0.5625,
+	0.5078125, 0.453125, 0.39453125, 0.33203125, 0.26953125, 0.20703125, 0.140625, 0.078125,
+	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+	0.0078125, 0.07421875, 0.13671875, 0.203125, 0.265625, 0.328125, 0.38671875, 0.44921875,
+	0.49609375, 0.5546875, 0.60546875, 0.65625, 0.703125, 0.75, 0.7890625, 0.828125
 };
 #endif
 
 static float BASE_DUTY_LOOKUP[NUM_PHASES][DUTY_STEPS];
 
-// -------- PRIVATE --------
+// ----------------------PRIVATE----------------------
 // motor control
 static void motor_init(struct Motor *motor);
 static void motor_start(struct Motor *motor);
@@ -82,7 +81,7 @@ static void motor_set_pwm_all(struct Motor *motor, float value);
 static int motor_get_position(struct Motor *motor);
 static int in_range(int x);
 
-// -------- PUBLIC --------
+// ----------------------PUBLIC----------------------
 /* Configure both motors and set them up.
  * timer instances + GPIO pins for each motor
  */
@@ -191,7 +190,6 @@ void motors_stop() {
 /* Calibrate the motors by doing both directions for both the wheels.
  */
 void motors_calibrate() {
-
 	motor_calibrate(&motor_L, 1, 0);
 	motor_calibrate(&motor_L, -1, 0);
 
@@ -209,14 +207,14 @@ void motors_speeds(int16_t l_rpm, int16_t r_rpm) {
 //-------------------------------interrupt callbacks-------------------------------
 /* This is the interrupt function for whenever the hall sensor readings change.
  */
-void HALL_ISR_Callback(struct Motor *motor){
+void HALL_ISR_Callback(struct Motor *motor) {
 
 }
 
 /* This is the interrupt function to change the duty cycle 16x per commutation phase.
  * Duration: ~15 microseconds
  */
-void Duty_ISR_Callback(struct Motor *motor){
+void Duty_ISR_Callback(struct Motor *motor) {
 	int i, index;
 
 	if (motor->stop) {
@@ -245,7 +243,7 @@ void Duty_ISR_Callback(struct Motor *motor){
  * It also checks to make sure the heart beat is valid.
  * Duration: ~25 microseconds
  */
-void Speed_ISR_Callback(struct Motor *motor){
+void Speed_ISR_Callback(struct Motor *motor) {
 	// if no new data in a second, stop!!
 	if (HAL_GetTick() - last_rx_time > HEARTBEAT_PERIOD) {
 		motor_stop(motor);
@@ -267,7 +265,7 @@ void Speed_ISR_Callback(struct Motor *motor){
 
 	if (newPos == motor->position) {
 		motor_pwm(motor, motor->pwm + motor->pos_increment);
-	} else if (in_range(newPos - motor->position - motor->direction) != 0){
+	} else if (in_range(newPos - motor->position - motor->direction) != 0) {
 		motor_pwm(motor, motor->pwm - motor->neg_increment);
 	}
 
@@ -300,7 +298,6 @@ void Speed_ISR_Callback(struct Motor *motor){
 	motor_high_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][1]); //not necessary for trapezoidal
 #endif
 
-
 	motor_low_on(motor, REVERSE_HALL_LOOKUP[motor->next_position][2]);
 
 	__HAL_TIM_SET_AUTORELOAD(&(motor->setup.htim_duty), (motor->speed >> 4) - 1);
@@ -311,7 +308,7 @@ void Speed_ISR_Callback(struct Motor *motor){
 
 /* Initialize all the variables and all the timers related to a motor.
  */
-static void motor_init(struct Motor *motor){
+static void motor_init(struct Motor *motor) {
 	motor_speed(motor, MIN_SPEED);
 
 	motor->position = motor_get_position(motor);
@@ -321,7 +318,6 @@ static void motor_init(struct Motor *motor){
 
 	motor->pos_increment = 0;
 	motor->neg_increment = 0;
-
 
 	motor_TIM_PWM_init(motor);
 	motor_TIM_Duty_init(motor);
@@ -343,7 +339,7 @@ static void motor_init(struct Motor *motor){
 /* Start the motor by enabling the interrupts and
  * setting the duty cycles to 0.
  */
-static void motor_start(struct Motor *motor){
+static void motor_start(struct Motor *motor) {
 	motor_set_pwm_all(motor, 0);
 	HAL_NVIC_SetPriority(motor->setup.EXTI_IRQn, 0, 0);
 	HAL_NVIC_EnableIRQ(motor->setup.EXTI_IRQn);
@@ -363,7 +359,7 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 	//check it is in the valid range
 	int absrpm = rpm;
 	if (absrpm < 0) {
-		absrpm = 0-absrpm;
+		absrpm = 0 - absrpm;
 	}
 
 	if (absrpm > MAX_SPEED) {
@@ -384,7 +380,7 @@ static void motor_speed(struct Motor *motor, int16_t rpm) {
 	if (tick_speed < 0) {
 		motor->direction = -1 * motor->setup.OFFSET_DIR;
 		motor->speed = -1 * (int16_t) tick_speed; //absolute value of <speed>
-	} else  {
+	} else {
 		motor->direction = motor->setup.OFFSET_DIR;
 		motor->speed = (int16_t) tick_speed;
 	}
@@ -426,11 +422,11 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t
 	motor_high_off(motor, 2);
 
 	// oh god something is broken why is the power ramping up so high, emergency exit
-	if (power > 100 ) {
+	if (power > 100) {
 		motor_set_pwm_all(motor, 0);
 		while (!Uart_is_TX_free());
-		sprintf((char *)&uart.TX_buffer[0],"max limited power reached, probably something is wrong\n");
-		Uart_TX((char *)&uart.TX_buffer[0]);
+		sprintf((char *) &uart.TX_buffer[0], "max limited power reached, probably something is wrong\n");
+		Uart_TX((char *) &uart.TX_buffer[0]);
 		return;
 	}
 
@@ -443,17 +439,17 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t
 		for (j = 0; j < NUM_PHASES; j++) {
 			HAL_IWDG_Refresh(&hiwdg);   //819mS
 
-			motor_high_off(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*(j-1))][0]);
-			motor_low_off(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*(j-1))][2]);
+			motor_high_off(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * (j - 1))][0]);
+			motor_low_off(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * (j - 1))][2]);
 
-			motor_high_on(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*j)][0]);
-			motor_low_on(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir*j)][2]);
+			motor_high_on(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * j)][0]);
+			motor_low_on(motor, REVERSE_HALL_LOOKUP[in_range(calibration_dir * j)][2]);
 
 			delay_ms(delay);
 			calibrate_positions[j] = motor_get_position(motor);
 		}
 
-		offset_dir = calibrate_positions[0] - calibrate_positions[NUM_PHASES-1];
+		offset_dir = calibrate_positions[0] - calibrate_positions[NUM_PHASES - 1];
 
 		// didn't really move, ramp up power
 		if (offset_dir == 0) {
@@ -470,9 +466,9 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t
 	motor_high_off(motor, 2);
 	motor_set_pwm_all(motor, 0);
 
-	if (offset_dir > NUM_PHASES/2) {
+	if (offset_dir > NUM_PHASES / 2) {
 		offset_dir -= NUM_PHASES;
-	} else if (offset_dir < -NUM_PHASES/2) {
+	} else if (offset_dir < -NUM_PHASES / 2) {
 		offset_dir += NUM_PHASES;
 	}
 
@@ -483,16 +479,16 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t
 	}
 
 	// make sure all the offsets are right
-	for (i = 0; i < NUM_PHASES - 1; i ++) {
-		if (in_range(calibrate_positions[i+1] - calibrate_positions[i]) != in_range(offset_dir) ) {
+	for (i = 0; i < NUM_PHASES - 1; i++) {
+		if (in_range(calibrate_positions[i + 1] - calibrate_positions[i]) != in_range(offset_dir)) {
 			motor_calibrate(motor, calibration_dir, power + 1);
 			return;
 		}
 	}
 
 	while (!Uart_is_TX_free());
-	sprintf((char *)&uart.TX_buffer[0],"%c%+d: %d\n", motor->setup.side, offset_dir, in_range(-calibrate_positions[NUM_PHASES - 1]));
-	Uart_TX((char *)&uart.TX_buffer[0]);
+	sprintf((char *) &uart.TX_buffer[0], "%c%+d: %d\n", motor->setup.side, offset_dir, in_range(-calibrate_positions[NUM_PHASES - 1]));
+	Uart_TX((char *) &uart.TX_buffer[0]);
 }
 
 /* Set the pwm for a motor - calculate what the duty cycle values should
@@ -500,13 +496,13 @@ static void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t
  *
  * Error bit will be set if the pwm value is over the limit.
  */
-static void motor_pwm(struct Motor *motor, float value_percent){
+static void motor_pwm(struct Motor *motor, float value_percent) {
 	int i, j;
 
 	if (value_percent > MAX_POWER_PERCENT) {
 		SET_ERROR_BIT(status, STATUS_MAX_POWER_REACHED);
 		value_percent = MAX_POWER_PERCENT;
-	} else if (value_percent < 0){
+	} else if (value_percent < 0) {
 		value_percent = 0;
 	} else {
 		CLR_ERROR_BIT(status, STATUS_MAX_POWER_REACHED);
@@ -524,7 +520,7 @@ static void motor_pwm(struct Motor *motor, float value_percent){
 
 /* Stop everything: turn off all the fets, and set the PWM duty cycles to 0.
  */
-static void motor_stop(struct Motor *motor){
+static void motor_stop(struct Motor *motor) {
 	motor_set_pwm_all(motor, 0);
 	motor->stop = 1;
 
@@ -547,7 +543,7 @@ static void motor_stop(struct Motor *motor){
 /* Set up the GPIO pins for the hall sensor pins.
  * Enable the interrupts for the hall sensors.
  */
-static void motor_HallSensor_init(struct Motor *motor){
+static void motor_HallSensor_init(struct Motor *motor) {
 	GPIO_InitTypeDef GPIO_InitStruct;
 
 	/* GPIO Ports Clock Enable */
@@ -570,8 +566,7 @@ static void motor_HallSensor_init(struct Motor *motor){
 
 /* Initialize the timer responsible for the pwm - no interrupts.
  */
-static void motor_TIM_PWM_init(struct Motor *motor)
-{
+static void motor_TIM_PWM_init(struct Motor *motor) {
 	GPIO_InitTypeDef GPIO_InitStruct;
 	TIM_OC_InitTypeDef sConfigOC;
 	TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig;
@@ -592,7 +587,7 @@ static void motor_TIM_PWM_init(struct Motor *motor)
 	motor_high_off(motor, 1);
 	motor_high_off(motor, 2);
 
-	motor->uwPeriodValue = (uint32_t) ((SystemCoreClock  / PWM_MOTOR) - 1);
+	motor->uwPeriodValue = (uint32_t) ((SystemCoreClock / PWM_MOTOR) - 1);
 
 	//PULLUPS
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -626,7 +621,7 @@ static void motor_TIM_PWM_init(struct Motor *motor)
 	sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_ENABLE; //TIM_OSSI_DISABLE;
 	sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_ENABLE; //TIM_OSSR_DISABLE;
 	sBreakDeadTimeConfig.DeadTime = 40;   //10;
-	HAL_TIMEx_ConfigBreakDeadTime(&(motor->setup.htim_pwm),&sBreakDeadTimeConfig);
+	HAL_TIMEx_ConfigBreakDeadTime(&(motor->setup.htim_pwm), &sBreakDeadTimeConfig);
 
 
 	//##-2- Configure the PWM channels #########################################
@@ -651,7 +646,7 @@ static void motor_TIM_PWM_init(struct Motor *motor)
 	HAL_TIM_PWM_Start(&(motor->setup.htim_pwm), TIM_CHANNEL_2);         //CH2
 	HAL_TIM_PWM_Start(&(motor->setup.htim_pwm), TIM_CHANNEL_3);         //CH3
 
-	motor_set_pwm_all(motor,0);
+	motor_set_pwm_all(motor, 0);
 
 	motor_low_off(motor, 0);
 	motor_low_off(motor, 1);
@@ -667,15 +662,15 @@ static void motor_TIM_PWM_init(struct Motor *motor)
  * This timer has a frequency of 16x the speed timer, so the interrupt happens
  * 16 times per commutation phase.
  */
-static void motor_TIM_Duty_init(struct Motor *motor){
+static void motor_TIM_Duty_init(struct Motor *motor) {
 	if (motor->setup.htim_duty.Instance == TIM6)
 		__HAL_RCC_TIM6_CLK_ENABLE();
 	else if (motor->setup.htim_duty.Instance == TIM7)
 		__HAL_RCC_TIM7_CLK_ENABLE();
 
 	// wait until the the next event to update the preload shadow register
-	motor->setup.htim_duty.Init.Prescaler = (uint32_t) ((SystemCoreClock  / 1000000) - 1); // instructions per microsecond
-	motor->setup.htim_duty.Init.Period = (motor->speed >> 4) -1; //period to update the duty cycle, 1/16 of speed
+	motor->setup.htim_duty.Init.Prescaler = (uint32_t) ((SystemCoreClock / 1000000) - 1);// instructions per microsecond
+	motor->setup.htim_duty.Init.Period = (motor->speed >> 4) -1;//period to update the duty cycle, 1/16 of speed
 	motor->setup.htim_duty.Init.ClockDivision = 0;
 	motor->setup.htim_duty.Init.CounterMode = TIM_COUNTERMODE_UP;
 	HAL_NVIC_SetPriority(motor->setup.TIM_DUTY_IRQn, 2, 0);
@@ -686,14 +681,14 @@ static void motor_TIM_Duty_init(struct Motor *motor){
 
 /* Set up the timer to do the commutation - frequency depends on input rpm.
  */
-static void motor_TIM_Speed_init(struct Motor *motor){
+static void motor_TIM_Speed_init(struct Motor *motor) {
 	if (motor->setup.htim_speed.Instance == TIM3)
 		__HAL_RCC_TIM3_CLK_ENABLE();
 	else if (motor->setup.htim_speed.Instance == TIM4)
 		__HAL_RCC_TIM4_CLK_ENABLE();
 
 	motor->setup.htim_speed.Instance->CR1 = motor->setup.htim_speed.Instance->CR1 | TIM_CR1_ARPE_Msk;
-	motor->setup.htim_speed.Init.Prescaler = (uint32_t) ((SystemCoreClock  / 1000000) - 1); // instructions per microsecond
+	motor->setup.htim_speed.Init.Prescaler = (uint32_t) ((SystemCoreClock / 1000000) - 1); // instructions per microsecond
 	motor->setup.htim_speed.Init.Period = motor->speed - 1;
 	motor->setup.htim_speed.Init.ClockDivision = 0;
 	motor->setup.htim_speed.Init.CounterMode = TIM_COUNTERMODE_UP;
@@ -709,7 +704,7 @@ static void motor_TIM_Speed_init(struct Motor *motor){
 /* Turn on the lower mosfet of the half bridge of the corresponding channel.
  */
 static void motor_low_on(struct Motor *motor, uint8_t channel) {
-	(motor->setup.GPIO_LOW_PORTS[channel])->BSRR = ((uint32_t)motor->setup.GPIO_LOW_CH_PINS[channel]) << 16;
+	(motor->setup.GPIO_LOW_PORTS[channel])->BSRR = ((uint32_t) motor->setup.GPIO_LOW_CH_PINS[channel]) << 16;
 }
 
 /* Turn off the lower mosfet of the half bridge of the corresponding channel.
@@ -735,15 +730,15 @@ static void motor_high_off(struct Motor *motor, uint8_t channel) {
 /* Set the PWM duty cycle for whatever channel.
  */
 static void motor_set_pwm(struct Motor *motor, uint8_t channel, float value) {
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[channel],value);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm), TIM_CHANNELS[channel], value);
 }
 
 /* Set the PWM duty cycle for all the channels.
  */
 static void motor_set_pwm_all(struct Motor *motor, float value) {
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[0],value);
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[1],value);
-	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm),TIM_CHANNELS[2],value);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm), TIM_CHANNELS[0], value);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm), TIM_CHANNELS[1], value);
+	__HAL_TIM_SET_COMPARE(&(motor->setup.htim_pwm), TIM_CHANNELS[2], value);
 }
 
 // ----------------------PRIVATE----------------------
@@ -751,18 +746,18 @@ static void motor_set_pwm_all(struct Motor *motor, float value) {
 
 /* Gets the position deteremind by the hall sensors.
  */
-static int motor_get_position(struct Motor *motor){
-	int pos = (motor->setup.HALL_PORT->IDR & (motor->setup.HALL_PINS[0]|motor->setup.HALL_PINS[1]|motor->setup.HALL_PINS[2])) / motor->setup.HALL_PINS[0];
+static int motor_get_position(struct Motor *motor) {
+	int pos = (motor->setup.HALL_PORT->IDR & (motor->setup.HALL_PINS[0] | motor->setup.HALL_PINS[1] | motor->setup.HALL_PINS[2])) / motor->setup.HALL_PINS[0];
 	return HALL_LOOKUP[pos - 1];
 }
 
-/* Limit the hall reading to the range 0-5
+/* Effectively modulos 6 operator, but without actually doing any division.
  */
 static int in_range(int x) {
 	const int mod_lookup_table[18] = {
-			0,1,2,3,4,5,
-			0,1,2,3,4,5,
-			0,1,2,3,4,5
+			0, 1, 2, 3, 4, 5,
+			0, 1, 2, 3, 4, 5,
+			0, 1, 2, 3, 4, 5
 	};
-	return mod_lookup_table[x+6];
+	return mod_lookup_table[x + 6];
 }

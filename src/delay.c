@@ -6,6 +6,41 @@
 
 TIM_HandleTypeDef TimHandle;
 
+// ----------------------PRIVATE----------------------
+void _init_us(void);
+void _init_ms(void);
+void _stop_timer(void);
+
+// ----------------------PUBLIC----------------------
+/* Delay for given number of milliseconds.
+ */
+void delay_ms(uint32_t mSecs) {
+	// init and start timer
+	_init_ms();
+
+	// dummy loop with 16 bit count wrap around
+	uint32_t start = TIM2->CNT;
+	while((TIM2->CNT-start) <= mSecs);
+
+	// stop timer
+	_stop_timer();
+}
+
+/* Delay for given number of microseconds.
+ */
+void delay_us(uint32_t uSecs) {
+	// init and start timer
+	_init_us();
+
+	// dummy loop with 16 bit count wrap around
+	uint32_t start = TIM2->CNT;
+	while((TIM2->CNT-start) <= uSecs);
+
+	// stop timer
+	_stop_timer();
+}
+
+// ----------------------PRIVATE----------------------
 /* Init & start timer for microseconds delays
  */
 void _init_us() {
@@ -38,32 +73,3 @@ void _stop_timer() {
 	HAL_TIM_Base_Stop(&TimHandle);
 	__HAL_RCC_TIM2_CLK_DISABLE();
 }
-
-/* Delay for given number of milliseconds.
- */
-void delay_ms(uint32_t mSecs) {
-	// init and start timer
-	_init_ms();
-
-	// dummy loop with 16 bit count wrap around
-	uint32_t start = TIM2->CNT;
-	while((TIM2->CNT-start) <= mSecs);
-
-	// stop timer
-	_stop_timer();
-}
-
-/* Delay for given number of microseconds.
- */
-void delay_us(uint32_t uSecs) {
-	// init and start timer
-	_init_us();
-
-	// dummy loop with 16 bit count wrap around
-	uint32_t start = TIM2->CNT;
-	while((TIM2->CNT-start) <= uSecs);
-
-	// stop timer
-	_stop_timer();
-}
-

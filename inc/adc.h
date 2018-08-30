@@ -29,8 +29,8 @@ struct ADC_setup {
 struct ADC {
 	struct ADC_setup setup;
 	uint16_t motor_center;
-	volatile __IO uint16_t avg_current;
-	volatile __IO uint16_t data[2];
+	volatile uint16_t avg_current;
+	volatile uint16_t data[2];
 };
 
 // ----------------------PUBLIC----------------------
