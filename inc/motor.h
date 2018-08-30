@@ -74,34 +74,10 @@ struct Motor {
 };
 
 // PUBLIC
-void Motors_setup_and_init(void);
-void Motors_speeds(int16_t l_rpm, int16_t r_rpm);
-void Motors_stop();
-#ifdef CALIBRATION
-void Motors_calibrate();
-void motor_calibrate(struct Motor *motor, int8_t calibration_dir, uint8_t power);
-#endif
-
-// PRIVATE
-void motor_init(struct Motor *motor);
-void motor_start(struct Motor *motor);
-void motor_stop(struct Motor *motor);
-void motor_speed(struct Motor *motor, int16_t rpm);
-void motor_pwm(struct Motor *motor, float value_percent);
-
-void motor_TIM_PWM_init(struct Motor *motor);
-void motor_TIM_Duty_init(struct Motor *motor);
-void motor_TIM_Speed_init(struct Motor *motor);
-void motor_HallSensor_init(struct Motor *motor);
-
-void motor_Low_ON(struct Motor *motor, uint8_t channel);
-void motor_Low_OFF(struct Motor *motor, uint8_t channel);
-void motor_High_ON(struct Motor *motor, uint8_t channel);
-void motor_High_OFF(struct Motor *motor, uint8_t channel);
-void motor_Set_PWM(struct Motor *motor, uint8_t channel, float value);
-void motor_Set_PWM_ALL(struct Motor *motor, float value);
-
-int motor_Get_Position(struct Motor *motor);
+void motors_setup_and_init(void);
+void motors_stop();
+void motors_calibrate();
+void motors_speeds(int16_t l_rpm, int16_t r_rpm);
 
 void HALL_ISR_Callback(struct Motor *motor);
 void Duty_ISR_Callback(struct Motor *motor);

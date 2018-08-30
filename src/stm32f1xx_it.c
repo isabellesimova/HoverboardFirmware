@@ -78,7 +78,7 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
 	/* USER CODE BEGIN HardFault_IRQn 0 */
-	Motors_stop();
+	motors_stop();
 
 	/* USER CODE END HardFault_IRQn 0 */
 	while (1)
@@ -96,7 +96,7 @@ void MemManage_Handler(void)
 {
 
 	/* USER CODE BEGIN MemoryManagement_IRQn 0 */
-	Motors_stop();
+	motors_stop();
 
 	/* USER CODE END MemoryManagement_IRQn 0 */
 	while (1)
@@ -113,7 +113,7 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
 	/* USER CODE BEGIN BusFault_IRQn 0 */
-	Motors_stop();
+	motors_stop();
 
 	/* USER CODE END BusFault_IRQn 0 */
 	while (1)
@@ -130,7 +130,7 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
 	/* USER CODE BEGIN UsageFault_IRQn 0 */
-	Motors_stop();
+	motors_stop();
 
 	/* USER CODE END UsageFault_IRQn 0 */
 	while (1)
@@ -321,7 +321,6 @@ void TIM4_IRQHandler(void)
 	HAL_TIM_IRQHandler(&(motor_L.setup.htim_speed));
 	Speed_ISR_Callback(&motor_L);
 }
-
 
 /* USER CODE BEGIN 1 */
 

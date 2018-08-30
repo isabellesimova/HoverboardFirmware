@@ -8,19 +8,17 @@
 #include "adc.h"
 #include "motor.h"
 
-
 extern volatile __IO struct UART uart;
-
 
 /* Private variables ---------------------------------------------------------*/
 
 /* Private function prototypes -----------------------------------------------*/
-void SystemClock_Config(void);
+static void SystemClock_Config(void);
 void error_handler(void);
 static void MX_IWDG_Init(void);
-void receive_data();
-void transmit_data();
-void check_power();
+static void receive_data();
+static void transmit_data();
+static void check_power();
 
 
 IWDG_HandleTypeDef hiwdg;
@@ -57,13 +55,13 @@ int main(void)
 	led_set(1);
 
 	MX_USART2_UART_Init();
-	ADCs_setup_and_init();
-	Motors_setup_and_init();
+	adcs_setup_and_init();
+	motors_setup_and_init();
 
 #ifdef CALIBRATION
 
 	while (1) {
-		Motors_calibrate();
+		motors_calibrate();
 	}
 #else
 
@@ -104,11 +102,11 @@ int main(void)
  * Process the newly received data. If a proper frame was processed, update the last_rx_time.
  * Update the motors to the new speeds.
  */
-void receive_data() {
+static void receive_data() {
 	int uart_rx_status = Uart_RX_process();
 	if (uart_rx_status == 1) {
 		last_rx_time = HAL_GetTick();
-		Motors_speeds(speeds[0], speeds[1]);
+		motors_speeds(speeds[0], speeds[1]);
 	}
 }
 
@@ -116,15 +114,15 @@ void receive_data() {
  * Send the status byte, as well as the battery voltage if the TX line is free.
  * In DEBUG mode, additional readings are outputted - current readings from the wheel.
  */
-void transmit_data() {
+static void transmit_data() {
 	float data_v;
-	data_v = GET_BATTERY_VOLT();
+	data_v = get_battery_volt();
 
 #if defined(DEBUG) && !defined(DEBUG_NO_ADC)
 	//TODO: These readings are not in amps, needs work.
 	float data_i_L, data_i_R;
-	data_i_L = GET_MOTOR_AMP(&adc_L);
-	data_i_R = GET_MOTOR_AMP(&adc_R);
+	data_i_L = get_motor_current(&adc_L);
+	data_i_R = get_motor_current(&adc_R);
 	sprintf((char *)&uart.TX_buffer[0],"[%d, %d, %d, %d]\n", status, (int)data_v, (int)data_i_L, (int)data_i_R);
 #else
 	sprintf((char *)&uart.TX_buffer[0],"[%d, %d]\n", status, (int)data_v);
@@ -143,14 +141,14 @@ void transmit_data() {
  * If either of them is true, the robot should not move,
  * and the corresponding error bits should be set in the status byte.
  */
-void check_power() {
+static void check_power() {
 	/* based off of power button at PA1
 	 * PA1 is detected high at ~2V in 3.3V system
 	 * voltage detected is 1/16 of battery voltage
 	 */
-	if (GET_BATTERY_VOLT() < 32) {
+	if (get_battery_volt() < 32) {
 		SET_ERROR_BIT(status, STATUS_LOW_BATTERY);
-		Motors_stop();
+		motors_stop();
 		buzzer_short_beep();
 	} else {
 		CLR_ERROR_BIT(status, STATUS_LOW_BATTERY);
@@ -162,7 +160,7 @@ void check_power() {
 	 */
 	if (is_charging()) {
 		SET_ERROR_BIT(status, STATUS_IS_CHARGING);
-		Motors_stop();
+		motors_stop();
 	} else {
 		CLR_ERROR_BIT(status, STATUS_IS_CHARGING);
 	}
@@ -173,7 +171,7 @@ void check_power() {
 
 /** System Clock Configuration
  */
-void SystemClock_Config(void)
+static void SystemClock_Config(void)
 {
 
 	RCC_OscInitTypeDef RCC_OscInitStruct;
@@ -250,7 +248,7 @@ void error_handler(void)
 {
 	/* USER CODE BEGIN error_handler */
 	/* User can add his own implementation to report the HAL error return state */
-	Motors_stop();
+	motors_stop();
 
 	while(1)
 	{
