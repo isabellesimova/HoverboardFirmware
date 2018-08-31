@@ -190,6 +190,12 @@ void motors_stop() {
 /* Calibrate the motors by doing both directions for both the wheels.
  */
 void motors_calibrate() {
+	HAL_NVIC_DisableIRQ(motor_L.setup.TIM_DUTY_IRQn);
+	HAL_NVIC_DisableIRQ(motor_L.setup.TIM_SPEED_IRQn);
+
+	HAL_NVIC_DisableIRQ(motor_R.setup.TIM_DUTY_IRQn);
+	HAL_NVIC_DisableIRQ(motor_R.setup.TIM_SPEED_IRQn);
+
 	motor_calibrate(&motor_L, 1, 0);
 	motor_calibrate(&motor_L, -1, 0);
 
