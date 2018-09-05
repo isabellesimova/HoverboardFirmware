@@ -234,7 +234,7 @@ static void MX_IWDG_Init(void)
 	{
 		error_handler();
 	}
-	__HAL_IWDG_START(&hiwdg);
+  HAL_IWDG_Start(&hiwdg);
 }
 
 

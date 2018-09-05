@@ -33,7 +33,7 @@ void button_init(void){
 	/*Configure GPIO pin in: BUTTON_PIN */
 	GPIO_InitStruct.Pin = BUTTON_PIN_IN;
 	GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(BUTTON_GPIO_PORT, &GPIO_InitStruct);
 

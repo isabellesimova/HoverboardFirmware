@@ -461,7 +461,7 @@ void motor_TIM_PWM_init(struct Motor *motor)
 
 	//PULLUPS
 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
 	GPIO_InitStruct.Pull = GPIO_PULLUP;
 	GPIO_InitStruct.Pin = motor->setup.GPIO_LOW_CH_PINS[0];
 	HAL_GPIO_Init(motor->setup.GPIO_LOW_PORTS[0], &GPIO_InitStruct);
@@ -472,7 +472,7 @@ void motor_TIM_PWM_init(struct Motor *motor)
 
 	//PULLDOWNS
 	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
 	GPIO_InitStruct.Pull = GPIO_PULLDOWN;
 	GPIO_InitStruct.Pin = motor->setup.GPIO_HIGH_CH_PINS;
 	HAL_GPIO_Init(motor->setup.GPIO_HIGH_PORT, &GPIO_InitStruct);
@@ -583,7 +583,7 @@ void motor_HallSensor_init(struct Motor *motor){
 	/*Configure GPIO pins : HALL_LEFT_A_PIN HALL_LEFT_B_PIN HALL_LEFT_C_PIN */
 	GPIO_InitStruct.Pin = motor->setup.HALL_PINS[0]|motor->setup.HALL_PINS[1]|motor->setup.HALL_PINS[2];
 	GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+	GPIO_InitStruct.Speed = GPIO_SPEED_HIGH;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	HAL_GPIO_Init(motor->setup.HALL_PORT, &GPIO_InitStruct);
 
