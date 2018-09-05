@@ -11,8 +11,8 @@ If your STLINK is attached to the same machine, pressing the 'right arrow' icon 
 ## Command Line
 1. Install the command line tool via the [cli installation guide](https://docs.platformio.org/en/latest/installation.html)
 2. cd to the Hoverbot directory
-3. Build it: 
+3. Build it & upload to ST: 
 ```
-pio run
+pio run -t upload
 ```
-4. If you see SUCCESS, that means it built :)
+4. If there are no errors, that means it built :)
